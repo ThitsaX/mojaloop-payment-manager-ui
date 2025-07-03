@@ -151,7 +151,12 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
             onClick={() => downloadTransfersToExcel(transfers)}
           />
         )}
-        <DataList columns={transfersColumns} list={transfers} onSelect={onTransferRowClick} />
+        <DataList
+          columns={transfersColumns}
+          list={transfers}
+          onSelect={onTransferRowClick}
+          pageSize={50}
+        />
       </div>
     );
     onSubmit = onTransfersSubmitClick;
