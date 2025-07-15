@@ -1,6 +1,6 @@
 /* eslint-disable react/jsx-curly-newline */
 /* eslint-disable jsx-a11y/label-has-associated-control */
-import React, { FC, useState } from 'react';
+import React, { FC, useState, useEffect } from 'react';
 import { connect } from 'react-redux';
 import { State, Dispatch } from 'store/types';
 import {
@@ -48,6 +48,18 @@ const TransferDetailsModal: FC<TransferDetailsModalProps> = ({
   isTransferDetailsPending,
   onModalCloseClick,
 }) => {
+  // Close modal on browser back navigation
+  useEffect(() => {
+    const handlePopState = () => {
+      onModalCloseClick();
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [onModalCloseClick]);
+
   let content = null;
 
   if (transferDetailsError || !model) {
@@ -1006,7 +1018,7 @@ const TransferDetailsView: FC<TransferDetailsProps> = ({ model }) => {
                   <label style={{ padding: '5px' }}>Payer Details</label>
                 </Row>
                 <Row align="flex-start" style={{ marginTop: '5px' }}>
-                  <label style={{ marginRight: '5px', minWidth: '40%' }}>Payer Identifier</label>
+                  <label style={{ marginRight: '5px', minWidth: '40%' }}>Payee Identifier</label>
                   <div style={{ marginRight: '5px', minWidth: '50%' }}>
                     <FormInput
                       disabled={true}
@@ -1017,7 +1029,7 @@ const TransferDetailsView: FC<TransferDetailsProps> = ({ model }) => {
                 </Row>
                 <Row align="flex-start" style={{ marginTop: '5px' }}>
                   <label style={{ marginRight: '5px', minWidth: '40%' }}>
-                    Payer Identifier Type
+                    Payee Identifier Type
                   </label>
                   <div style={{ marginRight: '5px', minWidth: '50%' }}>
                     <FormInput disabled={true} value={model.transferParties.payerParty.idType} />
