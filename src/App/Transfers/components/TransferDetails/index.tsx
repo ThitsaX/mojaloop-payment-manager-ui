@@ -1029,7 +1029,7 @@ const TransferDetailsView: FC<TransferDetailsProps> = ({ model }) => {
                 </Row>
                 <Row align="flex-start" style={{ marginTop: '5px' }}>
                   <label style={{ marginRight: '5px', minWidth: '40%' }}>
-                    Payee Identifier Type
+                    Payer Identifier Type
                   </label>
                   <div style={{ marginRight: '5px', minWidth: '50%' }}>
                     <FormInput disabled={true} value={model.transferParties.payerParty.idType} />
