@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash($env:NODE_OPTIONS=\"--openssl-legacy-provider\")",
+      "Bash(npm run build:*)",
+      "Bash(node:*)"
+    ],
+    "deny": []
+  }
+}

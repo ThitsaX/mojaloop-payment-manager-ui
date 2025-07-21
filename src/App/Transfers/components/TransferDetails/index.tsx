@@ -1,6 +1,6 @@
 /* eslint-disable react/jsx-curly-newline */
 /* eslint-disable jsx-a11y/label-has-associated-control */
-import React, { FC, useState } from 'react';
+import React, { FC, useState, useEffect } from 'react';
 import { connect } from 'react-redux';
 import { State, Dispatch } from 'store/types';
 import {
@@ -48,6 +48,18 @@ const TransferDetailsModal: FC<TransferDetailsModalProps> = ({
   isTransferDetailsPending,
   onModalCloseClick,
 }) => {
+  // Close modal on browser back navigation
+  useEffect(() => {
+    const handlePopState = () => {
+      onModalCloseClick();
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [onModalCloseClick]);
+
   let content = null;
 
   if (transferDetailsError || !model) {

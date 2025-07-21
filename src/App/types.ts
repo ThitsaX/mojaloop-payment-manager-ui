@@ -219,7 +219,7 @@ export interface User {
   familyName: string;
   email: string;
   logoutUrl: string;
-  kratos: boolean;
+  kratos?: boolean;
 }
 
 export interface AppUiConfig {
