@@ -25,6 +25,12 @@ export function loadTechnicalDashboard(TechnicalDashboard: FC) {
       this.props.onTechnicalDashboardMount(this.props.metricRequests);
     }
 
+    componentDidUpdate(prevProps: TechnicalDashboardLoaderProps) {
+      if (prevProps.metricRequests !== this.props.metricRequests) {
+        this.props.onTechnicalDashboardMount(this.props.metricRequests);
+      }
+    }
+
     render() {
       return <TechnicalDashboard />;
     }
