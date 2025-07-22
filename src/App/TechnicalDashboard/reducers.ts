@@ -92,8 +92,12 @@ const getMetricRequests = (filters: TechnicalDashboardFilters): RequestMetricAct
 
   // default of 600,600 for request rate
   // default of 20, 600 for latency
+  // Use higher aggregation for inbound metrics to ensure data availability
+  const inboundAggregation = Math.max(aggregateDurationSeconds, 600);
+  const inboundResolution = Math.max(resolutionSeconds, 600);
 
   return [
+    // Outbound metrics
     requestMetric({
       metricName: 'mojaloop_connector_outbound_party_lookup_request_count',
       startTimestamp: startTimestamp.toISOString(),
@@ -138,6 +142,52 @@ const getMetricRequests = (filters: TechnicalDashboardFilters): RequestMetricAct
       endTimestamp: endTimestamp.toISOString(),
       aggregateDurationSeconds,
       resolutionSeconds,
+    }),
+    // Inbound metrics
+    requestMetric({
+      metricName: 'mojaloop_connector_inbound_party_lookup_request_count',
+      startTimestamp: startTimestamp.toISOString(),
+      endTimestamp: endTimestamp.toISOString(),
+      aggregateDurationSeconds: inboundAggregation,
+      resolutionSeconds: inboundResolution,
+    }),
+    requestMetric({
+      metricName: 'mojaloop_connector_inbound_quote_request_count',
+      startTimestamp: startTimestamp.toISOString(),
+      endTimestamp: endTimestamp.toISOString(),
+      aggregateDurationSeconds: inboundAggregation,
+      resolutionSeconds: inboundResolution,
+    }),
+    requestMetric({
+      metricName: 'mojaloop_connector_inbound_transfer_prepare_count',
+      startTimestamp: startTimestamp.toISOString(),
+      endTimestamp: endTimestamp.toISOString(),
+      aggregateDurationSeconds: inboundAggregation,
+      resolutionSeconds: inboundResolution,
+    }),
+    requestMetric({
+      metricName: 'mojaloop_connector_inbound_party_lookup_latency',
+      metricType: 'HIST_SIZE',
+      startTimestamp: startTimestamp.toISOString(),
+      endTimestamp: endTimestamp.toISOString(),
+      aggregateDurationSeconds: inboundAggregation,
+      resolutionSeconds: inboundResolution,
+    }),
+    requestMetric({
+      metricName: 'mojaloop_connector_inbound_quote_request_latency',
+      metricType: 'HIST_SIZE',
+      startTimestamp: startTimestamp.toISOString(),
+      endTimestamp: endTimestamp.toISOString(),
+      aggregateDurationSeconds: inboundAggregation,
+      resolutionSeconds: inboundResolution,
+    }),
+    requestMetric({
+      metricName: 'mojaloop_connector_inbound_transfer_latency',
+      metricType: 'HIST_SIZE',
+      startTimestamp: startTimestamp.toISOString(),
+      endTimestamp: endTimestamp.toISOString(),
+      aggregateDurationSeconds: inboundAggregation,
+      resolutionSeconds: inboundResolution,
     }),
   ];
 };
