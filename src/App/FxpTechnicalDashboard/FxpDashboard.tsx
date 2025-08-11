@@ -190,7 +190,6 @@ const FxpTechnicalDashboard: FC<FxpTechnicalDashboardProps> = ({
         <Tabs>
           <TabList>
             <Tab>Outbound</Tab>
-            <Tab>Inbound</Tab>
           </TabList>
           <TabPanels>
             <TabPanel flex={true}>

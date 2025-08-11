@@ -42,7 +42,7 @@ export const getMetricData = createSelector(
 );
 
 export const getTechnicalDashboardFilters = (state: State): TechnicalDashboardFilters =>
-  state.technicalDashboard.filters;
+  state.fxpTechnicalDashboard.filters;
 
 export const getMetricRequests = (state: State): RequestMetricAction[] =>
-  state.technicalDashboard.metricRequests;
+  state.fxpTechnicalDashboard.metricRequests;

@@ -18,73 +18,73 @@ export const getStartTimestamp = (secs: string | number) => {
 export const getAggregateDurationFromTimeFrame = (secs: string | number) => {
   // 1 hour
   if (secs <= 3600) {
-    return 20;
+    return 600;
   }
   // 2 hours
   if (secs <= 7200) {
-    return 20;
+    return 600;
   }
   // 4 hours
   if (secs <= 14400) {
-    return 20;
+    return 600;
   }
   // 8 hours
   if (secs <= 28800) {
-    return 40;
+    return 600;
   }
   // 12 hours
   if (secs <= 43200) {
-    return 40;
+    return 720;
   }
   // 24 hours
   if (secs <= 86400) {
-    return 40;
+    return 1440;
   }
   // 48 hours
   if (secs <= 172800) {
-    return 120;
+    return 2880;
   }
   // 1 week
   if (secs <= 604800) {
-    return 120;
+    return 10080;
   }
-  return 120;
+  return 10080;
 };
 
 export const getResolutionSecondsFromTimeFrame = (secs: string | number) => {
-  // 1 hour
+  // 1 hour - 60 data points (1 per minute)
   if (secs <= 3600) {
-    return 20;
+    return 60;
   }
-  // 2 hours
+  // 2 hours - 60 data points (1 per 2 minutes)
   if (secs <= 7200) {
-    return 20;
+    return 120;
   }
-  // 4 hours
+  // 4 hours - 60 data points (1 per 4 minutes)
   if (secs <= 14400) {
-    return 20;
+    return 240;
   }
-  // 8 hours
+  // 8 hours - 60 data points (1 per 8 minutes)
   if (secs <= 28800) {
-    return 40;
+    return 480;
   }
-  // 12 hours
+  // 12 hours - 60 data points (1 per 12 minutes)
   if (secs <= 43200) {
-    return 40;
+    return 720;
   }
-  // 24 hours
+  // 24 hours - 60 data points (1 per 24 minutes)
   if (secs <= 86400) {
-    return 40;
+    return 1440;
   }
-  // 48 hours
+  // 48 hours - 60 data points (1 per 48 minutes)
   if (secs <= 172800) {
-    return 120;
+    return 2880;
   }
-  // 1 week
+  // 1 week - 60 data points (1 per 2.8 hours)
   if (secs <= 604800) {
-    return 120;
+    return 10080;
   }
-  return 120;
+  return 10080;
 };
 
 const getMetricRequests = (filters: TechnicalDashboardFilters): RequestMetricAction[] => {
