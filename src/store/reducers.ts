@@ -5,6 +5,7 @@ import { apiReducer } from 'utils/api';
 import { reducer as appReducer } from 'App';
 import { reducer as dashboardReducer } from 'App/Dashboard';
 import { reducer as technicalDashboardReducer } from 'App/TechnicalDashboard';
+import { reducer as fxpTechnicalDashboardReducer } from 'App/FxpTechnicalDashboard';
 import { reducer as transfersReducer } from 'App/Transfers';
 import { reducer as wizardReducer } from 'App/ConnectionWizard';
 import {
@@ -20,6 +21,7 @@ const getReducer = (history: History): Reducer =>
     router: connectRouter(history),
     dashboard: dashboardReducer,
     technicalDashboard: technicalDashboardReducer,
+    fxpTechnicalDashboard: fxpTechnicalDashboardReducer,
     transfers: transfersReducer,
     wizard: wizardReducer,
     fxpConversions: fxpConversionsReducer,

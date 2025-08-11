@@ -24,11 +24,11 @@ const stateProps = (state: State) => ({
   filters: selectors.getTechnicalDashboardFilters(state),
   partyLookupRateData: selectors.getMetricData(
     state,
-    'mojaloop_connector_outbound_party_lookup_request_count'
+    'mojaloop_connector_outbound_fxpConversion_party_lookup_request_count'
   ),
   quoteRequestRateData: selectors.getMetricData(
     state,
-    'mojaloop_connector_outbound_quote_request_count'
+    'mojaloop_connector_outbound_fxpConversion_quote_request_count'
   ),
   prepareRateData: selectors.getMetricData(
     state,
@@ -36,11 +36,11 @@ const stateProps = (state: State) => ({
   ),
   partyLookupLatencyData: selectors.getMetricData(
     state,
-    'mojaloop_connector_outbound_party_lookup_latency'
+    'mojaloop_connector_outbound_fxpConversion_party_lookup_latency'
   ),
   quoteRequestLatencyData: selectors.getMetricData(
     state,
-    'mojaloop_connector_outbound_quote_request_latency'
+    'mojaloop_connector_outbound_fxpConversion_quote_request_latency'
   ),
   fxpConversionLatencyData: selectors.getMetricData(
     state,
@@ -190,7 +190,6 @@ const FxpTechnicalDashboard: FC<FxpTechnicalDashboardProps> = ({
         <Tabs>
           <TabList>
             <Tab>Outbound</Tab>
-            <Tab>Inbound</Tab>
           </TabList>
           <TabPanels>
             <TabPanel flex={true}>
