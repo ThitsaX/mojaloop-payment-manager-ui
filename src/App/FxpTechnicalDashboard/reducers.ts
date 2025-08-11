@@ -95,14 +95,14 @@ const getMetricRequests = (filters: TechnicalDashboardFilters): RequestMetricAct
 
   return [
     requestMetric({
-      metricName: 'mojaloop_connector_outbound_party_lookup_request_count',
+      metricName: 'mojaloop_connector_outbound_fxpConversion_party_lookup_request_count',
       startTimestamp: startTimestamp.toISOString(),
       endTimestamp: endTimestamp.toISOString(),
       aggregateDurationSeconds,
       resolutionSeconds,
     }),
     requestMetric({
-      metricName: 'mojaloop_connector_outbound_quote_request_count',
+      metricName: 'mojaloop_connector_outbound_fxpConversion_quote_request_count',
       startTimestamp: startTimestamp.toISOString(),
       endTimestamp: endTimestamp.toISOString(),
       aggregateDurationSeconds,
@@ -116,7 +116,7 @@ const getMetricRequests = (filters: TechnicalDashboardFilters): RequestMetricAct
       resolutionSeconds,
     }),
     requestMetric({
-      metricName: 'mojaloop_connector_outbound_party_lookup_latency',
+      metricName: 'mojaloop_connector_outbound_fxpConversion_party_lookup_latency',
       metricType: 'HIST_SIZE',
       startTimestamp: startTimestamp.toISOString(),
       endTimestamp: endTimestamp.toISOString(),
@@ -124,7 +124,7 @@ const getMetricRequests = (filters: TechnicalDashboardFilters): RequestMetricAct
       resolutionSeconds,
     }),
     requestMetric({
-      metricName: 'mojaloop_connector_outbound_quote_request_latency',
+      metricName: 'mojaloop_connector_outbound_fxpConversion_quote_request_latency',
       metricType: 'HIST_SIZE',
       startTimestamp: startTimestamp.toISOString(),
       endTimestamp: endTimestamp.toISOString(),
