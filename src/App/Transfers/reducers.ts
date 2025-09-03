@@ -159,6 +159,7 @@ export default function transfersReducer(
       return {
         ...state,
         isTransfersRequested: true,
+        transfersError: null, // Clear error when new request starts
       };
     case UNREQUEST_TRANSFERS:
       return {
@@ -169,6 +170,7 @@ export default function transfersReducer(
       return {
         ...state,
         transfers: action.data,
+        transfersError: null, // Clear error on successful fetch
       };
     case SET_TRANSFERS_ERROR:
       return {

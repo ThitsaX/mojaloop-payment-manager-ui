@@ -87,21 +87,12 @@ function* fetchTransfers(action: RequestTransfersAction) {
 
     // eslint-disable-next-line
     const response = yield call(apis.transfers.read, { params });
-    
-    // Add debugging to see what we're getting
-    console.log('Transfer Response Status:', response.status);
-    console.log('Transfer Response Data:', response.data);
-    console.log('Is 20x status:', is20x(response.status));
-    
     if (is20x(response.status)) {
-      console.log('Setting transfers with data:', response.data);
       yield put(setTransfers({ data: response.data }));
     } else {
-      console.log('Non-2xx status code:', response.status);
       yield put(setTransfersError({ error: `HTTP ${response.status}` }));
     }
   } catch (e) {
-    console.log('Transfer fetch error:', e);
     yield put(setTransfersError({ error: e.message }));
   }
 }

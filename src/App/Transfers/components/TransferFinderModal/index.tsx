@@ -168,7 +168,6 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
     };
     submitLabel = 'Find Transfers';
   } else if (transfersError) {
-    console.log('Transfer Error State:', transfersError);
     content = <ErrorBox>Transfer: Unable to load transfers - {transfersError}</ErrorBox>;
   } else if (isTransfersPending) {
     content = (
