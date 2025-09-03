@@ -56,6 +56,12 @@ import {
   TOGGLE_TRANSFER_DETAILS_MODAL,
   SetTransferDetailsErrorAction,
   SET_TRANSFER_DETAILS_ERROR,
+  REQUEST_TRANSFERS_COUNT,
+  SET_TRANSFERS_COUNT,
+  SET_TRANSFERS_COUNT_ERROR,
+  RequestTransfersCountAction,
+  SetTransfersCountAction,
+  SetTransfersCountErrorAction,
 } from './types';
 
 export function requestTransfersPageData(): RequestTransfersPageDataAction {
@@ -141,10 +147,17 @@ export function setTransfersError({ error }: { error: string }): SetTransfersErr
   };
 }
 
-export function requestTransfers({ filters }: { filters: TransferFilter }): RequestTransfersAction {
+export function requestTransfers({ 
+  filters, 
+  pagination 
+}: { 
+  filters: TransferFilter;
+  pagination?: { offset: number; limit: number };
+}): RequestTransfersAction {
   return {
     type: REQUEST_TRANSFERS,
     filters,
+    pagination,
   };
 }
 
@@ -265,6 +278,27 @@ export function setTransfersAvgTimeError({
 }): SetTransfersAvgTimeErrorAction {
   return {
     type: SET_TRANSFERS_AVG_TIME_ERROR,
+    error,
+  };
+}
+
+export function requestTransfersCount({ filters }: { filters: TransferFilter }): RequestTransfersCountAction {
+  return {
+    type: REQUEST_TRANSFERS_COUNT,
+    filters,
+  };
+}
+
+export function setTransfersCount({ count }: { count: number }): SetTransfersCountAction {
+  return {
+    type: SET_TRANSFERS_COUNT,
+    count,
+  };
+}
+
+export function setTransfersCountError({ error }: { error: string }): SetTransfersCountErrorAction {
+  return {
+    type: SET_TRANSFERS_COUNT_ERROR,
     error,
   };
 }

@@ -10,6 +10,8 @@ import {
   UNREQUEST_TRANSFERS,
   SET_TRANSFERS,
   SET_TRANSFERS_ERROR,
+  SET_TRANSFERS_COUNT,
+  SET_TRANSFERS_COUNT_ERROR,
   SET_TRANSFERS_STATUSES,
   SET_TRANSFERS_STATUSES_ERROR,
   SET_TRANSFERS_SUCCESS_PERC,
@@ -70,6 +72,9 @@ export const initialState: TransfersState = {
   isTransfersRequested: false,
   transfers: [],
   transfersError: null,
+  transfersCount: 0,
+  isTransfersCountPending: false,
+  transfersCountError: null,
   transfersStatuses: [],
   transfersStatusesError: null,
   transfersSuccessPercError: null,
@@ -169,6 +174,16 @@ export default function transfersReducer(
       return {
         ...state,
         transfersError: action.error,
+      };
+    case SET_TRANSFERS_COUNT:
+      return {
+        ...state,
+        transfersCount: action.count,
+      };
+    case SET_TRANSFERS_COUNT_ERROR:
+      return {
+        ...state,
+        transfersCountError: action.error,
       };
     case SET_TRANSFERS_STATUSES:
       return {

@@ -106,6 +106,11 @@ const transfers: Config<Todo, State> = {
   url: () => '/transfers',
 };
 
+const transfersCount: Config<Todo, State> = {
+  service: services.localNode,
+  url: () => '/transfers/count',
+};
+
 const transferDetails: Config<Todo, State> = {
   service: services.localNode,
   url: (_: State, { transferId }: { transferId: string }) => `/transfers/${transferId}/details`,
@@ -268,6 +273,7 @@ const endpoints = {
   transferDetails,
   transfersErrors,
   transfers,
+  transfersCount,
   transfersStatuses,
   transfersSuccessPerc,
   transfersAvgTime,

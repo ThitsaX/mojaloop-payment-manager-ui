@@ -6,12 +6,14 @@ import {
   REQUEST_TRANSFERS_PAGE_DATA,
   REQUEST_TRANSFERS_ERRORS,
   REQUEST_TRANSFERS,
+  REQUEST_TRANSFERS_COUNT,
   REQUEST_TRANSFERS_STATUSES,
   REQUEST_TRANSFERS_SUCCESS_PERC,
   REQUEST_TRANSFERS_AVG_TIME,
   REQUEST_TRANSFER_DETAILS,
   RequestTransfersAction,
   RequestTransfersErrorsAction,
+  RequestTransfersCountAction,
   RequestTransfersStatusesAction,
   RequestTransfersSuccessPercAction,
   RequestTransfersAvgTimeAction,
@@ -24,6 +26,8 @@ import {
   setTransfersError,
   setTransfersErrors,
   setTransfersErrorsError,
+  setTransfersCount,
+  setTransfersCountError,
   setTransfersStatuses,
   setTransfersStatusesError,
   setTransfersSuccessPerc,
@@ -71,12 +75,19 @@ function* fetchTransfers(action: RequestTransfersAction) {
         status: action.filters.status,
       };
     }
+
+    // Add pagination parameters if provided
+    if (action.pagination) {
+      params = {
+        ...params,
+        offset: action.pagination.offset,
+        limit: action.pagination.limit,
+      };
+    }
+
     // eslint-disable-next-line
     const response = yield call(apis.transfers.read, { params });
     if (is20x(response.status)) {
-      // Original line that limited the number of transfers
-      // yield put(setTransfers({ data: response.data.slice(0, 50) }));
-      // Updated line to fetch all transfers
       yield put(setTransfers({ data: response.data }));
     } else {
       yield put(setTransfersError({ error: response.status }));
@@ -86,8 +97,44 @@ function* fetchTransfers(action: RequestTransfersAction) {
   }
 }
 
+function* fetchTransfersCount(action: RequestTransfersCountAction) {
+  try {
+    let params;
+    if (action.filters.transferId) {
+      params = {
+        id: action.filters.transferId,
+      };
+    } else {
+      params = {
+        startTimestamp: new Date(action.filters.from as number).toISOString(),
+        endTimestamp: new Date(action.filters.to as number).toISOString(),
+        recipientIdType: action.filters.aliasType,
+        recipientIdValue: action.filters.payeeAlias,
+        recipientIdSubValue: action.filters.aliasSubValue,
+        direction: action.filters.direction,
+        institution: action.filters.institution,
+        status: action.filters.status,
+      };
+    }
+
+    // eslint-disable-next-line
+    const response = yield call(apis.transfersCount.read, { params });
+    if (is20x(response.status)) {
+      yield put(setTransfersCount({ count: response.data.count }));
+    } else {
+      yield put(setTransfersCountError({ error: response.status }));
+    }
+  } catch (e) {
+    yield put(setTransfersCountError({ error: e.message }));
+  }
+}
+
 export function* transfersSaga() {
   yield takeLatest([REQUEST_TRANSFERS], fetchTransfers);
+}
+
+export function* transfersCountSaga() {
+  yield takeLatest([REQUEST_TRANSFERS_COUNT], fetchTransfersCount);
 }
 
 function* fetchTransfersStatuses(action: RequestTransfersStatusesAction) {
@@ -194,6 +241,7 @@ export default function* rootSaga() {
     transfersPageSaga(),
     transfersErrorsSaga(),
     transfersSaga(),
+    transfersCountSaga(),
     transfersStatusesSaga(),
     transfersSuccessPercSaga(),
     transfersAvgTimeSaga(),

@@ -36,6 +36,13 @@ export const getIsTransfersPending = createSelector(
   isPending('transfers.read')
 );
 
+export const getTransfersCount = (state: State) => state.transfers.transfersCount;
+export const getIsTransfersCountPending = createSelector(
+  (state: State) => state.api,
+  isPending('transfersCount.read')
+);
+export const getTransfersCountError = (state: State) => state.transfers.transfersCountError;
+
 export const getTransfersStatuses = (state: State) => state.transfers.transfersStatuses;
 export const getTransfersStatusesError = (state: State) => state.transfers.transfersStatusesError;
 export const getIsTransfersStatusesPending = createSelector(

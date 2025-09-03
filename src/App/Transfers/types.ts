@@ -19,6 +19,9 @@ export const REQUEST_TRANSFERS = 'Transfers / Request Transfers';
 export const UNREQUEST_TRANSFERS = 'Transfers / Unrequest Transfers';
 export const SET_TRANSFERS = 'Transfers / Set Transfers';
 export const SET_TRANSFERS_ERROR = 'Transfers / Set Transfers Error';
+export const REQUEST_TRANSFERS_COUNT = 'Transfers / Request Transfers Count';
+export const SET_TRANSFERS_COUNT = 'Transfers / Set Transfers Count';
+export const SET_TRANSFERS_COUNT_ERROR = 'Transfers / Set Transfers Count Error';
 export const REQUEST_TRANSFERS_STATUSES = 'Transfers / Request Transfers Statuses';
 export const SET_TRANSFERS_STATUSES = 'Transfers / Set Transfers Statuses';
 export const SET_TRANSFERS_STATUSES_ERROR = 'Transfers / Set Transfers Statuses Error';
@@ -342,6 +345,9 @@ export interface TransfersState {
   isTransfersRequested: boolean;
   transfers: Transfer[];
   transfersError: ErrorMessage;
+  transfersCount: number;
+  isTransfersCountPending: boolean;
+  transfersCountError: ErrorMessage;
   transfersStatuses: TransfersStatus[];
   transfersStatusesError: ErrorMessage;
   transfersSuccessPerc?: SuccessPerc;
@@ -413,6 +419,10 @@ export interface SetTransferFinderFilterAction {
 export interface RequestTransfersAction {
   type: typeof REQUEST_TRANSFERS;
   filters: TransferFilter;
+  pagination?: {
+    offset: number;
+    limit: number;
+  };
 }
 
 export interface UnrequestTransfersAction {
@@ -426,6 +436,21 @@ export interface SetTransfersAction {
 
 export interface SetTransfersErrorAction {
   type: typeof SET_TRANSFERS_ERROR;
+  error: string;
+}
+
+export interface RequestTransfersCountAction {
+  type: typeof REQUEST_TRANSFERS_COUNT;
+  filters: TransferFilter;
+}
+
+export interface SetTransfersCountAction {
+  type: typeof SET_TRANSFERS_COUNT;
+  count: number;
+}
+
+export interface SetTransfersCountErrorAction {
+  type: typeof SET_TRANSFERS_COUNT_ERROR;
   error: string;
 }
 
@@ -503,6 +528,9 @@ export type TransfersActionTypes =
   | UnrequestTransfersAction
   | SetTransfersAction
   | SetTransfersErrorAction
+  | RequestTransfersCountAction
+  | SetTransfersCountAction
+  | SetTransfersCountErrorAction
   | RequestTransfersStatusesAction
   | SetTransfersStatusesAction
   | SetTransfersStatusesErrorAction

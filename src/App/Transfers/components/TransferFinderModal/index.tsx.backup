@@ -1,9 +1,10 @@
-import React, { FC, useState, useEffect } from 'react';
+import React, { FC } from 'react';
 import { connect } from 'react-redux';
 import { State, Dispatch } from 'store/types';
 import { AliasType, TransferDirection, TransferStatus } from 'App/types';
 import {
   DataLabel,
+  DataList,
   DatePicker,
   Link,
   ErrorBox,
@@ -19,7 +20,6 @@ import {
   TabPanels,
   TabPanel,
   Button,
-  PaginatedTable,
 } from 'components';
 import xlsx from 'xlsx';
 import * as actions from '../../actions';
@@ -35,22 +35,18 @@ const stateProps = (state: State) => ({
   transfersError: selectors.getTransfersError(state),
   isTransfersPending: selectors.getIsTransfersPending(state),
   isTransfersRequested: selectors.getIsTransfersRequested(state),
-  transfersCount: selectors.getTransfersCount(state),
-  isTransfersCountPending: selectors.getIsTransfersCountPending(state),
 });
 
 const dispatchProps = (dispatch: Dispatch) => ({
   onModalCloseClick: () => dispatch(actions.toggleTransferFinderModal()),
-  onFiltersSubmitClick: (filters: TransferFilter, pagination?: { offset: number; limit: number }) =>
-    dispatch(actions.requestTransfers({ filters, pagination })),
+  onFiltersSubmitClick: (filters: TransferFilter) =>
+    dispatch(actions.requestTransfers({ filters })),
   onTransfersSubmitClick: () => dispatch(actions.unrequestTransfers()),
   onFilterChange: ({ field, value }: { field: string; value: FilterChangeValue }) =>
     dispatch(actions.setTransferFinderFilter({ field, value })),
   onTransferRowClick: (transferError: TransferError) => {
     dispatch(actions.requestTransferDetails({ transferId: transferError.id }));
   },
-  onRequestTransfersCount: (filters: TransferFilter) => 
-    dispatch(actions.requestTransfersCount({ filters })),
 });
 
 interface TransferFinderModalProps {
@@ -59,14 +55,11 @@ interface TransferFinderModalProps {
   transfersError: string | null;
   isTransfersPending: boolean;
   isTransfersRequested: boolean;
-  transfersCount: number;
-  isTransfersCountPending: boolean;
-  onFiltersSubmitClick: (filters: TransferFilter, pagination?: { offset: number; limit: number }) => void;
+  onFiltersSubmitClick: (filters: TransferFilter) => void;
   onTransfersSubmitClick: () => void;
   onModalCloseClick: () => void;
   onFilterChange: ({ field, value }: { field: string; value: FilterChangeValue }) => void;
   onTransferRowClick: (transferError: TransferError) => void;
-  onRequestTransfersCount: (filters: TransferFilter) => void;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -86,29 +79,12 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
   transfersError,
   isTransfersPending,
   isTransfersRequested,
-  transfersCount,
-  isTransfersCountPending,
   onFiltersSubmitClick,
   onTransfersSubmitClick,
   onModalCloseClick,
   onFilterChange,
   onTransferRowClick,
-  onRequestTransfersCount,
 }) => {
-  const [pagination, setPagination] = useState({ offset: 0, limit: 20 });
-
-  // Request count when transfers are requested
-  useEffect(() => {
-    if (isTransfersRequested) {
-      onRequestTransfersCount(model);
-    }
-  }, [isTransfersRequested, model, onRequestTransfersCount]);
-
-  const handlePageChange = (newPagination: { offset: number; limit: number }) => {
-    setPagination(newPagination);
-    onFiltersSubmitClick(model, newPagination);
-  };
-
   let content = null;
   let onSubmit;
   let submitLabel;
@@ -155,10 +131,7 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
 
   if (!isTransfersRequested) {
     content = <TransferFilters model={model} onFilterChange={onFilterChange} />;
-    onSubmit = () => {
-      setPagination({ offset: 0, limit: 20 });
-      onFiltersSubmitClick(model, { offset: 0, limit: 20 });
-    };
+    onSubmit = () => onFiltersSubmitClick(model);
     submitLabel = 'Find Transfers';
   } else if (transfersError) {
     content = <ErrorBox>Transfer: Unable to load transfers</ErrorBox>;
@@ -178,22 +151,17 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
             onClick={() => downloadTransfersToExcel(transfers)}
           />
         )}
-        <PaginatedTable
+        <DataList
           columns={transfersColumns}
-          data={transfers}
-          pagination={pagination}
-          totalCount={transfersCount}
-          isLoading={isTransfersPending}
-          isLoadingCount={isTransfersCountPending}
-          onRowClick={onTransferRowClick}
-          onPageChange={handlePageChange}
+          list={transfers}
+          onSelect={onTransferRowClick}
+          pageSize={50}
         />
       </div>
     );
     onSubmit = onTransfersSubmitClick;
     submitLabel = 'Back to filtering';
   }
-  
   return (
     <Modal
       title="Find a Transfer"
@@ -209,7 +177,6 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
   );
 };
 
-// ... rest of the component remains the same (filters, constants, etc.)
 const dateRanges = [
   { label: 'Custom', value: 'CUSTOM' },
   { label: helpers.toSpacedPascalCase(DateRange.Today), value: DateRange.Today },
@@ -371,6 +338,36 @@ const TransferFilters: FC<TransferFiltersProps> = ({ model, onFilterChange }) =>
             <span style={{ width: '250px' }}>&nbsp;</span>
           </Column>
         </Row>
+        {/* <Row>
+          <Column>
+            <FormInput
+              id="find-transfer-modal__aliasType"
+              label="Payee Alias Type"
+              type="select"
+              options={aliasType}
+              value={model.aliasType || null}
+              onChange={(value: FilterChangeValue) => onFilterChange({ field: 'aliasType', value })}
+            />
+          </Column>
+          <Column style={{ marginLeft: '10px' }}>
+            <FormInput
+              id="find-transfer-modal__payeeAlias"
+              label="Payee Alias"
+              type="text"
+              value={model.payeeAlias || ''}
+              onChange={(value: FilterChangeValue) => onFilterChange({ field: 'payeeAlias', value })}
+            />
+          </Column>
+          <Column style={{ marginLeft: '10px' }}>
+            <FormInput
+              id="find-transfer-modal__aliasSubValue"
+              label="Payee Alias Sub Value"
+              type="text"
+              value={model.aliasSubValue || ''}
+              onChange={(value: FilterChangeValue) => onFilterChange({ field: 'aliasSubValue', value })}
+            />
+          </Column>
+        </Row> */}
         <br />
         <FormInput
           id="find-transfer-modal__institution"
