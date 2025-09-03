@@ -1,6 +1,5 @@
 import React, { FC, useState } from 'react';
 import { Link, Spinner } from 'components';
-import { CaretUpOutlined, CaretDownOutlined } from '@ant-design/icons';
 import Pagination from '../Pagination';
 import './PaginatedTable.scss';
 
@@ -104,15 +103,15 @@ const PaginatedTable: FC<PaginatedTableProps> = ({
                     {column.label}
                     {column.sortable && (
                       <div className="paginated-table-sort-indicators">
-                        <CaretUpOutlined
-                          className={`sort-icon ${
+                        <div
+                          className={`sort-arrow sort-arrow-up ${
                             sortConfig.key === column.key && sortConfig.direction === 'asc'
                               ? 'active'
                               : ''
                           }`}
                         />
-                        <CaretDownOutlined
-                          className={`sort-icon ${
+                        <div
+                          className={`sort-arrow sort-arrow-down ${
                             sortConfig.key === column.key && sortConfig.direction === 'desc'
                               ? 'active'
                               : ''
