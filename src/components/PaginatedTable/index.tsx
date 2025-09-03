@@ -1,5 +1,6 @@
-import React, { FC } from 'react';
+import React, { FC, useState } from 'react';
 import { Link, Spinner } from 'components';
+import { CaretUpOutlined, CaretDownOutlined } from '@ant-design/icons';
 import Pagination from '../Pagination';
 import './PaginatedTable.scss';
 
@@ -7,6 +8,7 @@ interface Column {
   label: string;
   key: string;
   func?: (value: any, item: any) => React.ReactNode;
+  sortable?: boolean;
 }
 
 interface PaginatedTableProps {
@@ -21,6 +23,7 @@ interface PaginatedTableProps {
   isLoadingCount?: boolean;
   onRowClick?: (item: any) => void;
   onPageChange: (pagination: { offset: number; limit: number }) => void;
+  showRowNumbers?: boolean;
 }
 
 const PaginatedTable: FC<PaginatedTableProps> = ({
@@ -32,8 +35,10 @@ const PaginatedTable: FC<PaginatedTableProps> = ({
   isLoadingCount = false,
   onRowClick,
   onPageChange,
+  showRowNumbers = false,
 }) => {
   const currentPage = Math.floor(pagination.offset / pagination.limit) + 1;
+  const [sortConfig, setSortConfig] = useState({ key: '', direction: 'asc' });
 
   const handlePageChange = (page: number, pageSize?: number) => {
     const newPageSize = pageSize || pagination.limit;
@@ -44,6 +49,31 @@ const PaginatedTable: FC<PaginatedTableProps> = ({
   const handlePageSizeChange = (current: number, size: number) => {
     onPageChange({ offset: 0, limit: size });
   };
+
+  const handleSort = (columnKey: string) => {
+    let direction = 'asc';
+    if (sortConfig.key === columnKey && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key: columnKey, direction });
+  };
+
+  // Apply sorting if a sort configuration is set
+  let sortedData = [...data];
+  if (sortConfig.key && data.length > 0) {
+    sortedData = data.sort((a: any, b: any) => {
+      const aValue = a[sortConfig.key];
+      const bValue = b[sortConfig.key];
+
+      if (aValue === null || aValue === undefined) return 1;
+      if (bValue === null || bValue === undefined) return -1;
+
+      let comparison = 0;
+      if (aValue > bValue) comparison = 1;
+      if (aValue < bValue) comparison = -1;
+      return sortConfig.direction === 'desc' ? comparison * -1 : comparison;
+    });
+  }
 
   if (isLoading) {
     return (
@@ -59,37 +89,74 @@ const PaginatedTable: FC<PaginatedTableProps> = ({
         <table className="paginated-table-content">
           <thead>
             <tr>
+              {showRowNumbers && (
+                <th className="paginated-table-header paginated-table-row-number">
+                  #
+                </th>
+              )}
               {columns.map((column) => (
-                <th key={column.key} className="paginated-table-header">
-                  {column.label}
+                <th 
+                  key={column.key} 
+                  className={`paginated-table-header ${column.sortable ? 'sortable' : ''}`}
+                  onClick={() => column.sortable && handleSort(column.key)}
+                >
+                  <div className="paginated-table-header-content">
+                    {column.label}
+                    {column.sortable && (
+                      <div className="paginated-table-sort-indicators">
+                        <CaretUpOutlined
+                          className={`sort-icon ${
+                            sortConfig.key === column.key && sortConfig.direction === 'asc'
+                              ? 'active'
+                              : ''
+                          }`}
+                        />
+                        <CaretDownOutlined
+                          className={`sort-icon ${
+                            sortConfig.key === column.key && sortConfig.direction === 'desc'
+                              ? 'active'
+                              : ''
+                          }`}
+                        />
+                      </div>
+                    )}
+                  </div>
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {data.length === 0 ? (
+            {sortedData.length === 0 ? (
               <tr>
-                <td colSpan={columns.length} className="paginated-table-empty">
+                <td colSpan={columns.length + (showRowNumbers ? 1 : 0)} className="paginated-table-empty">
                   No data found
                 </td>
               </tr>
             ) : (
-              data.map((item, index) => (
-                <tr
-                  key={item.id || index}
-                  className={`paginated-table-row ${onRowClick ? 'clickable' : ''}`}
-                  onClick={() => onRowClick && onRowClick(item)}
-                >
-                  {columns.map((column) => (
-                    <td key={column.key} className="paginated-table-cell">
-                      {column.func 
-                        ? column.func(item[column.key], item)
-                        : item[column.key] || ''
-                      }
-                    </td>
-                  ))}
-                </tr>
-              ))
+              sortedData.map((item, index) => {
+                const rowNumber = pagination.offset + index + 1;
+                return (
+                  <tr
+                    key={item.id || index}
+                    className={`paginated-table-row ${onRowClick ? 'clickable' : ''}`}
+                    onClick={() => onRowClick && onRowClick(item)}
+                  >
+                    {showRowNumbers && (
+                      <td className="paginated-table-cell paginated-table-row-number">
+                        {rowNumber}
+                      </td>
+                    )}
+                    {columns.map((column) => (
+                      <td key={column.key} className="paginated-table-cell">
+                        {column.func 
+                          ? column.func(item[column.key], item)
+                          : item[column.key] || ''
+                        }
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>

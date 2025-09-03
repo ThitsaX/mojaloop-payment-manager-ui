@@ -117,6 +117,7 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
     {
       label: 'Transfer ID',
       key: 'id',
+      sortable: true,
       func: (value: string, item: Transfer) => (
         <Link>
           <span style={{ textDecoration: 'underline' }}>{item.id}</span>
@@ -126,29 +127,35 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
     {
       label: 'Amount',
       key: 'amount',
+      sortable: true,
       func: (value: string, item: Transfer) => `${item.currency} ${item.amount}`,
     },
     {
       label: 'Direction',
       key: 'direction',
+      sortable: true,
       func: helpers.toSpacedPascalCase,
     },
     {
       label: 'Status',
       key: 'status',
+      sortable: true,
       func: helpers.toSpacedPascalCase,
     },
     {
       label: 'Batch ID',
       key: 'batchId',
+      sortable: true,
     },
     {
       label: 'Institution',
       key: 'institution',
+      sortable: true,
     },
     {
       label: 'Date',
       key: 'initiatedTimestamp',
+      sortable: true,
       func: helpers.toTransfersDate,
     },
   ];
@@ -176,6 +183,7 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
             label="Download Transfers"
             noFill
             onClick={() => downloadTransfersToExcel(transfers)}
+            style={{ marginBottom: '16px' }}
           />
         )}
         <PaginatedTable
@@ -187,6 +195,7 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
           isLoadingCount={isTransfersCountPending}
           onRowClick={onTransferRowClick}
           onPageChange={handlePageChange}
+          showRowNumbers={true}
         />
       </div>
     );
@@ -209,7 +218,6 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
   );
 };
 
-// ... rest of the component remains the same (filters, constants, etc.)
 const dateRanges = [
   { label: 'Custom', value: 'CUSTOM' },
   { label: helpers.toSpacedPascalCase(DateRange.Today), value: DateRange.Today },

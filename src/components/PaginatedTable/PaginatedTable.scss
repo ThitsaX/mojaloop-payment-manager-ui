@@ -30,6 +30,44 @@
   font-weight: 600;
   color: #262626;
   white-space: nowrap;
+  
+  &.sortable {
+    cursor: pointer;
+    user-select: none;
+    
+    &:hover {
+      background-color: #f0f0f0;
+    }
+  }
+}
+
+.paginated-table-header-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.paginated-table-sort-indicators {
+  display: flex;
+  flex-direction: column;
+  margin-left: 4px;
+  gap: 1px;
+  
+  .sort-icon {
+    font-size: 10px;
+    color: #d9d9d9;
+    transition: color 0.3s;
+    
+    &.active {
+      color: #1890ff;
+    }
+  }
+}
+
+.paginated-table-row-number {
+  width: 60px;
+  min-width: 60px;
+  text-align: center;
 }
 
 .paginated-table-row {
