@@ -484,40 +484,120 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
       onFiltersSubmitClick(model, initialPagination);
     };
     submitLabel = 'Find Transfers';
-  } else if (transfersError) {
-    const errorMessage = (() => {
-      if (isRetrying) {
-        return `Transfer: Unable to load transfers - ${transfersError} (retrying... ${retryCount}/${maxRetries})`;
-      } else if (retryCount >= maxRetries) {
+  } else if (transfersError || isTransfersPending) {
+    // Unified Status Display Component
+    const renderStatusDisplay = () => {
+      // Download progress takes priority
+      if (isDownloadingExcel && downloadProgress.stage) {
         return (
-          <div>
-            <div>Transfer: Unable to load transfers - {transfersError}</div>
-            <div style={{ marginTop: '10px' }}>
-              <Button
-                label="Retry"
-                onClick={handleManualRetry}
-                style={{ marginRight: '10px' }}
-              />
-              <Button
-                label="Close"
-                onClick={onModalCloseClick}
-                noFill
-              />
+          <div style={{
+            background: '#f8f9fa',
+            border: '1px solid #e9ecef',
+            borderRadius: '8px',
+            padding: '16px',
+            margin: '16px 0',
+            textAlign: 'center'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '12px' }}>
+              <Spinner size={16} />
+              <span style={{ fontSize: '14px', fontWeight: 500, color: '#495057' }}>
+                {downloadProgress.stage}
+              </span>
+            </div>
+            {downloadProgress.total > 0 && (
+              <div>
+                <div style={{
+                  width: '100%',
+                  maxWidth: '400px',
+                  height: '6px',
+                  backgroundColor: '#e9ecef',
+                  borderRadius: '3px',
+                  margin: '0 auto 8px',
+                  overflow: 'hidden'
+                }}>
+                  <div style={{
+                    width: `${(downloadProgress.current / downloadProgress.total) * 100}%`,
+                    height: '100%',
+                    backgroundColor: '#007bff',
+                    borderRadius: '3px',
+                    transition: 'width 0.3s ease'
+                  }} />
+                </div>
+                <span style={{ fontSize: '12px', color: '#6c757d' }}>
+                  {downloadProgress.current} of {downloadProgress.total} files completed
+                </span>
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      // Transfer loading state
+      if (isTransfersPending && !transfersError) {
+        return (
+          <div style={{
+            background: '#f8f9fa',
+            border: '1px solid #e9ecef',
+            borderRadius: '8px',
+            padding: '20px',
+            margin: '16px 0',
+            textAlign: 'center'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+              <Spinner size={16} />
+              <span style={{ fontSize: '14px', color: '#495057' }}>Loading transfers...</span>
             </div>
           </div>
         );
-      } else {
-        return `Transfer: Unable to load transfers - ${transfersError} (retrying... ${retryCount}/${maxRetries})`;
       }
-    })();
-    
-    content = <ErrorBox>{errorMessage}</ErrorBox>;
-  } else if (isTransfersPending) {
-    content = (
-      <div className="transfers__transfers__loader">
-        <Spinner size={20} />
-      </div>
-    );
+
+      // Error state with retry information
+      if (transfersError) {
+        const isRetryableError = transfersError?.includes('503');
+        return (
+          <div style={{
+            background: retryCount >= maxRetries ? '#f8d7da' : '#fff3cd',
+            border: `1px solid ${retryCount >= maxRetries ? '#f5c6cb' : '#ffeaa7'}`,
+            borderRadius: '8px',
+            padding: '16px',
+            margin: '16px 0',
+            textAlign: 'center'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '8px' }}>
+              <span style={{ fontSize: '18px' }}>{retryCount >= maxRetries ? '❌' : '⚠️'}</span>
+              <span style={{ fontSize: '14px', fontWeight: 500, color: retryCount >= maxRetries ? '#721c24' : '#856404' }}>
+                Unable to load transfers
+              </span>
+            </div>
+            <div style={{ fontSize: '12px', color: retryCount >= maxRetries ? '#721c24' : '#856404', marginBottom: '12px' }}>
+              {transfersError}
+              {isRetryableError && isRetrying && (
+                <span> (retrying... {retryCount}/{maxRetries})</span>
+              )}
+            </div>
+            {isRetryableError && retryCount >= maxRetries && (
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
+                <Button
+                  label="Retry"
+                  onClick={handleManualRetry}
+                  style={{ fontSize: '12px', padding: '6px 12px' }}
+                />
+                <Button
+                  label="Close"
+                  onClick={onModalCloseClick}
+                  style={{ fontSize: '12px', padding: '6px 12px' }}
+                  noFill
+                />
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      return null;
+    };
+
+    content = renderStatusDisplay();
   } else {
     content = (
       <div className="transfers__transfers__list">
@@ -538,34 +618,43 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
                 noFill
               />
             </div>
+            {/* Download progress display */}
             {isDownloadingExcel && downloadProgress.stage && (
-              <div style={{ marginTop: '8px', fontSize: '12px', color: '#666' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Spinner size={12} />
-                  <span>{downloadProgress.stage}</span>
+              <div style={{
+                background: '#f8f9fa',
+                border: '1px solid #e9ecef',
+                borderRadius: '8px',
+                padding: '16px',
+                marginTop: '12px',
+                textAlign: 'center'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '12px' }}>
+                  <Spinner size={16} />
+                  <span style={{ fontSize: '14px', fontWeight: 500, color: '#495057' }}>
+                    {downloadProgress.stage}
+                  </span>
                 </div>
                 {downloadProgress.total > 0 && (
-                  <div style={{ marginTop: '4px' }}>
-                    <div 
-                      style={{ 
-                        width: '200px', 
-                        height: '4px', 
-                        backgroundColor: '#f0f0f0', 
-                        borderRadius: '2px',
-                        overflow: 'hidden'
-                      }}
-                    >
-                      <div 
-                        style={{ 
-                          width: `${(downloadProgress.current / downloadProgress.total) * 100}%`, 
-                          height: '100%', 
-                          backgroundColor: '#007bff', 
-                          transition: 'width 0.3s ease'
-                        }} 
-                      />
+                  <div>
+                    <div style={{
+                      width: '100%',
+                      maxWidth: '400px',
+                      height: '6px',
+                      backgroundColor: '#e9ecef',
+                      borderRadius: '3px',
+                      margin: '0 auto 8px',
+                      overflow: 'hidden'
+                    }}>
+                      <div style={{
+                        width: `${(downloadProgress.current / downloadProgress.total) * 100}%`,
+                        height: '100%',
+                        backgroundColor: '#007bff',
+                        borderRadius: '3px',
+                        transition: 'width 0.3s ease'
+                      }} />
                     </div>
-                    <span style={{ fontSize: '11px' }}>
-                      {downloadProgress.current} / {downloadProgress.total} files
+                    <span style={{ fontSize: '12px', color: '#6c757d' }}>
+                      {downloadProgress.current} of {downloadProgress.total} files completed
                     </span>
                   </div>
                 )}
