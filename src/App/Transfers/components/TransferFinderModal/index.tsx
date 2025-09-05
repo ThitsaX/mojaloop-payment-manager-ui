@@ -235,11 +235,10 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
   const [isDownloadingExcel, setIsDownloadingExcel] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState({ current: 0, total: 0, stage: 'Initializing...' });
   const maxRetries = 2;
-  const RECORDS_PER_FILE = 10000; // 10K records per Excel file
+  const RECORDS_PER_FILE = 10000; // Max 10K records per Excel file
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastRequestParamsRef = useRef<{ filters: TransferFilter; pagination?: { offset: number; limit: number } } | null>(null);
 
-  // Request count when transfers are requested
   useEffect(() => {
     if (isTransfersRequested) {
       onRequestTransfersCount(model);
@@ -259,14 +258,13 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
     }
   }, [transfersError, isTransfersPending, retryCount, maxRetries, onFiltersSubmitClick, isRetrying]);
 
-  // Reset retry count when successful
   useEffect(() => {
     if (!transfersError && !isTransfersPending && retryCount > 0) {
       setRetryCount(0);
     }
   }, [transfersError, isTransfersPending, retryCount]);
 
-  // Cleanup timeout on unmount
+  // Cleanup timeout
   useEffect(() => {
     return () => {
       if (retryTimeoutRef.current) {
@@ -380,7 +378,7 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
             continue;
           }
           
-          // Small delay to prevent overwhelming the API
+          // delay to prevent api spike
           if (chunkIndex < totalChunks - 1) {
             await new Promise(resolve => setTimeout(resolve, 500)); // 500ms delay between chunks
           }
@@ -605,13 +603,13 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
           <div style={{ marginBottom: '16px' }}>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
               <Button
-                label={isDownloadingExcel ? 'Preparing Download...' : `Download All Transfers (${transfersCount.toLocaleString()} records)`}
+                label={isDownloadingExcel ? 'Preparing Download...' : `Download All (${transfersCount.toLocaleString()} records)`}
                 noFill
                 onClick={handleChunkedExcelDownload}
                 disabled={isDownloadingExcel || isTransfersPending}
               />
               <Button
-                label="Current Page Only"
+                label="Download Current Page"
                 onClick={() => downloadTransfersToExcel(transfers)}
                 disabled={isDownloadingExcel || isTransfersPending}
                 style={{ fontSize: '12px', padding: '6px 12px' }}
