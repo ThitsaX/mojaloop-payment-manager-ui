@@ -234,10 +234,13 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
   const [isRetrying, setIsRetrying] = useState(false);
   const [isDownloadingExcel, setIsDownloadingExcel] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState({ current: 0, total: 0, stage: 'Initializing...' });
+  const [downloadCancelled, setDownloadCancelled] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
   const maxRetries = 2;
   const RECORDS_PER_FILE = 10000; // Max 10K records per Excel file
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastRequestParamsRef = useRef<{ filters: TransferFilter; pagination?: { offset: number; limit: number } } | null>(null);
+  const downloadCancelledRef = useRef<boolean>(false);
 
   useEffect(() => {
     if (isTransfersRequested) {
@@ -288,16 +291,46 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
     }
   }, [onFiltersSubmitClick]);
 
+  const handleCancelDownload = useCallback(() => {
+    setDownloadCancelled(true);
+    downloadCancelledRef.current = true;
+    setDownloadProgress({ current: 0, total: 0, stage: 'Cancelling download...' });
+    
+    // Reset states after a brief delay to show cancellation message
+    setTimeout(() => {
+      setIsDownloadingExcel(false);
+      setDownloadCancelled(false);
+      setDownloadError(null);
+      setDownloadProgress({ current: 0, total: 0, stage: '' });
+      downloadCancelledRef.current = false;
+    }, 1500);
+  }, []);
+
+  const handleRetryDownload = useCallback(() => {
+    setDownloadError(null);
+    setDownloadCancelled(false);
+    downloadCancelledRef.current = false;
+    handleChunkedExcelDownload();
+  }, []);
+
   // Main chunked Excel download function
   const handleChunkedExcelDownload = useCallback(async () => {
     if (isDownloadingExcel || transfersCount === 0) return;
     
     setIsDownloadingExcel(true);
     setDownloadProgress({ current: 0, total: 0, stage: 'Initializing...' });
+    setDownloadError(null);
+    setDownloadCancelled(false);
+    downloadCancelledRef.current = false;
     
     try {
       const totalRecords = transfersCount;
       const totalChunks = Math.ceil(totalRecords / RECORDS_PER_FILE);
+      
+      // Check for cancellation
+      if (downloadCancelledRef.current) {
+        return;
+      }
       
       // If total records <= 10K, use single file download
       if (totalRecords <= RECORDS_PER_FILE) {
@@ -310,9 +343,16 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
             apiBaseUrl, 
             2, // maxRetries
             (retryStage: string) => {
-              setDownloadProgress({ current: 1, total: 1, stage: retryStage });
+              if (!downloadCancelledRef.current) {
+                setDownloadProgress({ current: 1, total: 1, stage: retryStage });
+              }
             }
           );
+          
+          if (downloadCancelledRef.current) {
+            return;
+          }
+          
           await downloadTransfersToExcel(singleChunkData);
           setDownloadProgress({ current: 1, total: 1, stage: 'Download complete!' });
         } catch (error) {
@@ -323,27 +363,33 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
         return;
       }
       
-      // For large datasets, inform user about alternative approach
+      // For large datasets, implement all-or-nothing chunked download
       if (totalRecords > RECORDS_PER_FILE) {
         setDownloadProgress({ 
           current: 0, 
           total: totalChunks, 
-          stage: `Large dataset detected (${totalRecords.toLocaleString()} records). Attempting chunked download...` 
+          stage: `Large dataset detected (${totalRecords.toLocaleString()} records). Preparing chunked download...` 
         });
         
         const allFiles: { filename: string; content: ArrayBuffer }[] = [];
-        let successfulChunks = 0;
         
-        // Fetch and process each chunk
+        // Fetch and process each chunk - ALL must succeed
         for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+          // Check for cancellation before each chunk
+          if (downloadCancelledRef.current) {
+            return;
+          }
+          
           const offset = chunkIndex * RECORDS_PER_FILE;
           const limit = Math.min(RECORDS_PER_FILE, totalRecords - offset);
           
-          setDownloadProgress({ 
-            current: chunkIndex + 1, 
-            total: totalChunks, 
-            stage: `Processing file ${chunkIndex + 1} of ${totalChunks} (${limit} records)...` 
-          });
+          if (!downloadCancelledRef.current) {
+            setDownloadProgress({ 
+              current: chunkIndex, 
+              total: totalChunks, 
+              stage: `Processing file ${chunkIndex + 1} of ${totalChunks} (${limit} records)...` 
+            });
+          }
           
           try {
             // Fetch data for this chunk with progress callback for retry information
@@ -354,41 +400,56 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
               apiBaseUrl, 
               2, // maxRetries
               (retryStage: string) => {
-                setDownloadProgress({ 
-                  current: chunkIndex + 1, 
-                  total: totalChunks, 
-                  stage: retryStage 
-                });
+                if (!downloadCancelledRef.current) {
+                  setDownloadProgress({ 
+                    current: chunkIndex, 
+                    total: totalChunks, 
+                    stage: retryStage 
+                  });
+                }
               }
             );
             
+            // Check for cancellation after fetch
+            if (downloadCancelledRef.current) {
+              return;
+            }
+            
             if (chunkData.length === 0) {
-              console.warn(`Chunk ${chunkIndex + 1} returned no data, skipping...`);
-              continue;
+              throw new Error(`Chunk ${chunkIndex + 1} returned no data`);
             }
             
             // Generate Excel file for this chunk
             const excelFile = generateExcelFileForChunk(chunkData, chunkIndex + 1);
             allFiles.push(excelFile);
-            successfulChunks++;
             
           } catch (chunkError) {
             console.error(`Failed to process chunk ${chunkIndex + 1}:`, chunkError);
-            // Continue with other chunks instead of failing completely
-            continue;
+            // ALL-OR-NOTHING: If any chunk fails, entire download fails
+            throw new Error(`Download failed at file ${chunkIndex + 1} of ${totalChunks}: ${chunkError.message}`);
           }
           
-          // delay to prevent api spike
-          if (chunkIndex < totalChunks - 1) {
+          // Update progress after successful chunk
+          if (!downloadCancelledRef.current) {
+            setDownloadProgress({ 
+              current: chunkIndex + 1, 
+              total: totalChunks, 
+              stage: `Completed file ${chunkIndex + 1} of ${totalChunks}` 
+            });
+          }
+          
+          // Small delay to prevent API spike
+          if (chunkIndex < totalChunks - 1 && !downloadCancelledRef.current) {
             await new Promise(resolve => setTimeout(resolve, 500)); // 500ms delay between chunks
           }
         }
         
-        if (allFiles.length === 0) {
-          throw new Error('Unable to fetch chunk data. Please try downloading current page data instead.');
+        // Check for cancellation before creating ZIP
+        if (downloadCancelledRef.current) {
+          return;
         }
         
-        // Create and download ZIP file (atomic operation)
+        // All chunks successful - create and download ZIP file
         setDownloadProgress({ 
           current: totalChunks, 
           total: totalChunks, 
@@ -397,27 +458,32 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
         
         await downloadZipFile(allFiles);
         
-        setDownloadProgress({ 
-          current: totalChunks, 
-          total: totalChunks, 
-          stage: `Download complete! ${allFiles.length} of ${totalChunks} files in ZIP.` 
-        });
+        if (!downloadCancelledRef.current) {
+          setDownloadProgress({ 
+            current: totalChunks, 
+            total: totalChunks, 
+            stage: `Download complete! All ${totalChunks} files successfully downloaded.` 
+          });
+        }
       }
       
     } catch (error) {
       console.error('Chunked Excel download failed:', error);
-      setDownloadProgress({ current: 0, total: 0, stage: `Error: ${error.message}` });
       
-      // Show error to user for a few seconds, then reset
-      setTimeout(() => {
-        setDownloadProgress({ current: 0, total: 0, stage: '' });
-      }, 5000);
+      if (!downloadCancelledRef.current) {
+        setDownloadError(error.message);
+        setDownloadProgress({ current: 0, total: 0, stage: `Download failed: ${error.message}` });
+      }
     } finally {
-      // Reset download state after a delay
-      setTimeout(() => {
-        setIsDownloadingExcel(false);
-        setDownloadProgress({ current: 0, total: 0, stage: '' });
-      }, 3000);
+      // Reset download state after a delay (only if not cancelled - cancellation handles its own reset)
+      if (!downloadCancelledRef.current) {
+        setTimeout(() => {
+          if (!downloadError) {
+            setIsDownloadingExcel(false);
+            setDownloadProgress({ current: 0, total: 0, stage: '' });
+          }
+        }, 3000);
+      }
     }
   }, [model, transfersCount, isDownloadingExcel, RECORDS_PER_FILE, transfers]);
 
@@ -619,22 +685,30 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
               />
             </div>
             {/* Download progress display */}
-            {isDownloadingExcel && downloadProgress.stage && (
+            {(isDownloadingExcel || downloadError) && downloadProgress.stage && (
               <div style={{
-                background: '#f8f9fa',
-                border: '1px solid #e9ecef',
+                background: downloadError ? '#f8d7da' : '#f8f9fa',
+                border: `1px solid ${downloadError ? '#f5c6cb' : '#e9ecef'}`,
                 borderRadius: '8px',
                 padding: '16px',
                 marginTop: '12px',
                 textAlign: 'center'
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '12px' }}>
-                  <Spinner size={16} />
-                  <span style={{ fontSize: '14px', fontWeight: 500, color: '#495057' }}>
+                  {downloadError ? (
+                    <span style={{ fontSize: '18px' }}>❌</span>
+                  ) : (
+                    <Spinner size={16} />
+                  )}
+                  <span style={{ 
+                    fontSize: '14px', 
+                    fontWeight: 500, 
+                    color: downloadError ? '#721c24' : '#495057' 
+                  }}>
                     {downloadProgress.stage}
                   </span>
                 </div>
-                {downloadProgress.total > 0 && (
+                {downloadProgress.total > 0 && !downloadError && (
                   <div>
                     <div style={{
                       width: '100%',
@@ -658,6 +732,35 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
                     </span>
                   </div>
                 )}
+                {/* Action buttons */}
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginTop: '12px' }}>
+                  {downloadError ? (
+                    <>
+                      <Button
+                        label="Retry Download"
+                        onClick={handleRetryDownload}
+                        style={{ fontSize: '12px', padding: '6px 12px' }}
+                      />
+                      <Button
+                        label="Cancel"
+                        onClick={() => {
+                          setDownloadError(null);
+                          setDownloadProgress({ current: 0, total: 0, stage: '' });
+                          setIsDownloadingExcel(false);
+                        }}
+                        style={{ fontSize: '12px', padding: '6px 12px' }}
+                        noFill
+                      />
+                    </>
+                  ) : isDownloadingExcel && !downloadCancelled && (
+                    <Button
+                      label="Cancel Download"
+                      onClick={handleCancelDownload}
+                      style={{ fontSize: '12px', padding: '6px 12px' }}
+                      noFill
+                    />
+                  )}
+                </div>
               </div>
             )}
           </div>
