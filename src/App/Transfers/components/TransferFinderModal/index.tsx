@@ -602,14 +602,16 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
         {transfers.length > 0 && (
           <div style={{ marginBottom: '16px' }}>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+              {transfersCount > 20 && (
+                <Button
+                  label={isDownloadingExcel ? 'Preparing Download...' : `Download All (${transfersCount.toLocaleString()} records)`}
+                  noFill
+                  onClick={handleChunkedExcelDownload}
+                  disabled={isDownloadingExcel || isTransfersPending}
+                />
+              )}
               <Button
-                label={isDownloadingExcel ? 'Preparing Download...' : `Download All (${transfersCount.toLocaleString()} records)`}
-                noFill
-                onClick={handleChunkedExcelDownload}
-                disabled={isDownloadingExcel || isTransfersPending}
-              />
-              <Button
-                label="Download Current Page"
+                label={transfersCount <= 20 ? "Download Results" : "Download Current Page"}
                 onClick={() => downloadTransfersToExcel(transfers)}
                 disabled={isDownloadingExcel || isTransfersPending}
                 style={{ fontSize: '12px', padding: '6px 12px' }}
