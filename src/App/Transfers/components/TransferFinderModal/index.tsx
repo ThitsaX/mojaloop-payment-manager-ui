@@ -20,6 +20,7 @@ import {
   TabPanel,
   Button,
   PaginatedTable,
+  MessageBox,
 } from 'components';
 import xlsx from 'xlsx';
 import JSZip from 'jszip';
@@ -236,8 +237,10 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
   const [downloadProgress, setDownloadProgress] = useState({ current: 0, total: 0, stage: 'Initializing...' });
   const [downloadCancelled, setDownloadCancelled] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [downloadLimitError, setDownloadLimitError] = useState<string | null>(null);
   const maxRetries = 2;
-  const RECORDS_PER_FILE = 10000; // Max 10K records per Excel file
+  const MAX_DOWNLOAD_LIMIT = 15000;
+  const RECORDS_PER_FILE = 3000; // Max 10K records per Excel file
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastRequestParamsRef = useRef<{ filters: TransferFilter; pagination?: { offset: number; limit: number } } | null>(null);
   const downloadCancelledRef = useRef<boolean>(false);
@@ -275,6 +278,17 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
       }
     };
   }, []);
+
+  // Show/clear download limit error based on transfer count
+  useEffect(() => {
+    if (transfersCount > MAX_DOWNLOAD_LIMIT && isTransfersRequested && !isTransfersPending) {
+      setDownloadLimitError(
+        `You have ${transfersCount.toLocaleString()} records in your search results, but the maximum allowed for download is ${MAX_DOWNLOAD_LIMIT.toLocaleString()} records. Please narrow your search criteria (date range, filters, etc.) to reduce the number of results.`
+      );
+    } else {
+      setDownloadLimitError(null);
+    }
+  }, [transfersCount, isTransfersRequested, isTransfersPending]);
 
   const handlePageChange = (newPagination: { offset: number; limit: number }) => {
     setPagination(newPagination);
@@ -316,13 +330,17 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
   // Main chunked Excel download function
   const handleChunkedExcelDownload = useCallback(async () => {
     if (isDownloadingExcel || transfersCount === 0) return;
-    
+
+    // Safety check: don't download if over limit (button should already be disabled)
+    if (transfersCount > MAX_DOWNLOAD_LIMIT) {
+      return;
+    }
     setIsDownloadingExcel(true);
     setDownloadProgress({ current: 0, total: 0, stage: 'Initializing...' });
     setDownloadError(null);
     setDownloadCancelled(false);
     downloadCancelledRef.current = false;
-    
+
     try {
       const totalRecords = transfersCount;
       const totalChunks = Math.ceil(totalRecords / RECORDS_PER_FILE);
@@ -541,7 +559,7 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
   if (!isTransfersRequested) {
     content = <TransferFilters model={model} onFilterChange={onFilterChange} />;
     onSubmit = () => {
-      const initialPagination = { offset: 0, limit: 20 };
+      const initialPagination = { offset: 0, limit: 100 };
       setPagination(initialPagination);
       lastRequestParamsRef.current = { filters: model, pagination: initialPagination };
       setRetryCount(0); // Reset retry count for new requests
@@ -665,19 +683,30 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
   } else {
     content = (
       <div className="transfers__transfers__list">
+        {downloadLimitError && (
+          <MessageBox kind="danger" style={{ marginBottom: '16px' }}>
+            {downloadLimitError}
+          </MessageBox>
+        )}
         {transfers.length > 0 && (
           <div style={{ marginBottom: '16px' }}>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-              {transfersCount > 20 && (
+              {transfersCount > 100 && (
                 <Button
-                  label={isDownloadingExcel ? 'Preparing Download...' : `Download All (${transfersCount.toLocaleString()} records)`}
+                  label={
+                    isDownloadingExcel
+                      ? 'Preparing Download...'
+                      : transfersCount > MAX_DOWNLOAD_LIMIT
+                        ? `Too Many Results (${transfersCount.toLocaleString()} records) - Refine Search`
+                        : `Download (${transfersCount.toLocaleString()} records)`
+                  }
                   noFill
                   onClick={handleChunkedExcelDownload}
-                  disabled={isDownloadingExcel || isTransfersPending}
+                  disabled={isDownloadingExcel || isTransfersPending || transfersCount > MAX_DOWNLOAD_LIMIT}
                 />
               )}
               <Button
-                label={transfersCount <= 20 ? "Download Results" : "Download Current Page"}
+                label={transfersCount <= 100 ? "Download Results" : "Download Current Page"}
                 onClick={() => downloadTransfersToExcel(transfers)}
                 disabled={isDownloadingExcel || isTransfersPending}
                 style={{ fontSize: '12px', padding: '6px 12px' }}

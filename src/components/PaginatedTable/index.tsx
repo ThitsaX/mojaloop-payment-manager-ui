@@ -77,7 +77,7 @@ const PaginatedTable: FC<PaginatedTableProps> = ({
   if (isLoading) {
     return (
       <div className="paginated-table-loading">
-        <Spinner size={20} />
+        <Spinner size={100} />
       </div>
     );
   }
@@ -168,7 +168,7 @@ const PaginatedTable: FC<PaginatedTableProps> = ({
           pageSize={pagination.limit}
           showSizeChanger
           showTotal={(total, range) => `${range[0]}-${range[1]} of ${total} transfers`}
-          pageSizeOptions={['20', '50', '100', '200']}
+          pageSizeOptions={['100', '200','500','1000']}
           onChange={handlePageChange}
           onShowSizeChange={handlePageSizeChange}
         />

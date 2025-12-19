@@ -21,7 +21,7 @@ const Pagination: FC<PaginationProps> = ({
   showSizeChanger = false,
   showQuickJumper = false,
   showTotal,
-  pageSizeOptions = ['20', '50', '100', '200'],
+  pageSizeOptions = ['100', '200','500','1000'],
   onChange,
   onShowSizeChange,
 }) => {
