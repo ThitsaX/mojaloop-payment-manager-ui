@@ -159,18 +159,27 @@ async function fetchTransferChunk(
 
 // Helper function to generate Excel file for a chunk
 function generateExcelFileForChunk(
-  transfers: any[], 
-  chunkIndex: number
+  transfers: any[],
+  chunkIndex: number,
+  dateFormat: 'iso' | 'readable' = 'iso'
 ): { filename: string; content: ArrayBuffer } {
-  const ws = xlsx.utils.json_to_sheet(transfers);
+  // Format dates in transfer data before creating Excel
+  const formattedTransfers = transfers.map(transfer => ({
+    ...transfer,
+    initiatedTimestamp: transfer.initiatedTimestamp
+      ? helpers.toTransfersDate(transfer.initiatedTimestamp, dateFormat)
+      : transfer.initiatedTimestamp
+  }));
+
+  const ws = xlsx.utils.json_to_sheet(formattedTransfers);
   const wscols = [{ wch: 20 }];
   ws['!cols'] = wscols;
   const wb = xlsx.utils.book_new();
   xlsx.utils.book_append_sheet(wb, ws, 'Transfers');
-  
+
   const filename = `Payment_Manager_Transfers_Part${chunkIndex.toString().padStart(2, '0')}.xlsx`;
   const content = xlsx.write(wb, { bookType: 'xlsx', type: 'array' });
-  
+
   return { filename, content };
 }
 
@@ -204,8 +213,19 @@ async function downloadZipFile(
 }
 
 // Legacy single-page download function (kept for backward compatibility)
-async function downloadTransfersToExcel(transfers: any): Promise<void> {
-  const ws = xlsx.utils.json_to_sheet(transfers);
+async function downloadTransfersToExcel(
+  transfers: any,
+  dateFormat: 'iso' | 'readable' = 'iso'
+): Promise<void> {
+  // Format dates in transfer data before creating Excel
+  const formattedTransfers = transfers.map((transfer: any) => ({
+    ...transfer,
+    initiatedTimestamp: transfer.initiatedTimestamp
+      ? helpers.toTransfersDate(transfer.initiatedTimestamp, dateFormat)
+      : transfer.initiatedTimestamp
+  }));
+
+  const ws = xlsx.utils.json_to_sheet(formattedTransfers);
   const wscols = [{ wch: 20 }];
   ws['!cols'] = wscols;
   const wb = xlsx.utils.book_new();
@@ -238,6 +258,7 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
   const [downloadCancelled, setDownloadCancelled] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [downloadLimitError, setDownloadLimitError] = useState<string | null>(null);
+  const [dateFormat, setDateFormat] = useState<'iso' | 'readable'>('iso');
   const maxRetries = 2;
   const MAX_DOWNLOAD_LIMIT = 15000;
   const RECORDS_PER_FILE = 3000; // Max 10K records per Excel file
@@ -371,11 +392,11 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
             return;
           }
           
-          await downloadTransfersToExcel(singleChunkData);
+          await downloadTransfersToExcel(singleChunkData, dateFormat);
           setDownloadProgress({ current: 1, total: 1, stage: 'Download complete!' });
         } catch (error) {
           console.log('Direct fetch failed, using current page data');
-          await downloadTransfersToExcel(transfers);
+          await downloadTransfersToExcel(transfers, dateFormat);
           setDownloadProgress({ current: 1, total: 1, stage: 'Download complete (current page)!' });
         }
         return;
@@ -438,7 +459,7 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
             }
             
             // Generate Excel file for this chunk
-            const excelFile = generateExcelFileForChunk(chunkData, chunkIndex + 1);
+            const excelFile = generateExcelFileForChunk(chunkData, chunkIndex + 1, dateFormat);
             allFiles.push(excelFile);
             
           } catch (chunkError) {
@@ -503,7 +524,7 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
         }, 3000);
       }
     }
-  }, [model, transfersCount, isDownloadingExcel, RECORDS_PER_FILE, transfers]);
+  }, [model, transfersCount, isDownloadingExcel, RECORDS_PER_FILE, transfers, dateFormat]);
 
   let content = null;
   let onSubmit;
@@ -552,7 +573,7 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
       label: 'Date',
       key: 'initiatedTimestamp',
       sortable: true,
-      func: helpers.toTransfersDate,
+      func: (value: string) => helpers.toTransfersDate(value, dateFormat),
     },
   ];
 
@@ -690,7 +711,8 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
         )}
         {transfers.length > 0 && (
           <div style={{ marginBottom: '16px' }}>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
               {transfersCount > 100 && (
                 <Button
                   label={
@@ -707,11 +729,21 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
               )}
               <Button
                 label={transfersCount <= 100 ? "Download Results" : "Download Current Page"}
-                onClick={() => downloadTransfersToExcel(transfers)}
+                onClick={() => downloadTransfersToExcel(transfers, dateFormat)}
                 disabled={isDownloadingExcel || isTransfersPending}
                 style={{ fontSize: '12px', padding: '6px 12px' }}
                 noFill
               />
+              </div>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <span style={{ fontSize: '12px', color: '#6c757d' }}>Date Format:</span>
+                <Button
+                  label={dateFormat === 'iso' ? 'ISO (2025-12-21T08:22:47+07:00)' : 'Readable (21/12/2025 08:22:47)'}
+                  onClick={() => setDateFormat(dateFormat === 'iso' ? 'readable' : 'iso')}
+                  style={{ fontSize: '11px', padding: '4px 8px' }}
+                  noFill
+                />
+              </div>
             </div>
             {/* Download progress display */}
             {(isDownloadingExcel || downloadError) && downloadProgress.stage && (
