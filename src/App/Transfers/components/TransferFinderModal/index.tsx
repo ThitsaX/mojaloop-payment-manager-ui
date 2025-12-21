@@ -260,8 +260,8 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
   const [downloadLimitError, setDownloadLimitError] = useState<string | null>(null);
   const [dateFormat, setDateFormat] = useState<'iso' | 'readable'>('iso');
   const maxRetries = 2;
-  const MAX_DOWNLOAD_LIMIT = 15000;
-  const RECORDS_PER_FILE = 3000; // Max 10K records per Excel file
+  const MAX_DOWNLOAD_LIMIT = 20000;
+  const RECORDS_PER_FILE = 2500; // Max 3000 records per Excel file
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastRequestParamsRef = useRef<{ filters: TransferFilter; pagination?: { offset: number; limit: number } } | null>(null);
   const downloadCancelledRef = useRef<boolean>(false);
@@ -580,7 +580,7 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
   if (!isTransfersRequested) {
     content = <TransferFilters model={model} onFilterChange={onFilterChange} />;
     onSubmit = () => {
-      const initialPagination = { offset: 0, limit: 100 };
+      const initialPagination = { offset: 0, limit: 50 };
       setPagination(initialPagination);
       lastRequestParamsRef.current = { filters: model, pagination: initialPagination };
       setRetryCount(0); // Reset retry count for new requests
@@ -713,7 +713,7 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
           <div style={{ marginBottom: '16px' }}>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-              {transfersCount > 100 && (
+              {transfersCount > 50 && (
                 <Button
                   label={
                     isDownloadingExcel
@@ -728,7 +728,7 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
                 />
               )}
               <Button
-                label={transfersCount <= 100 ? "Download Results" : "Download Current Page"}
+                label={transfersCount <= 50 ? "Download Results" : "Download Current Page"}
                 onClick={() => downloadTransfersToExcel(transfers, dateFormat)}
                 disabled={isDownloadingExcel || isTransfersPending}
                 style={{ fontSize: '12px', padding: '6px 12px' }}

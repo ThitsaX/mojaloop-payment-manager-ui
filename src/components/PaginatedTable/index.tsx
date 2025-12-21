@@ -147,7 +147,7 @@ const PaginatedTable: FC<PaginatedTableProps> = ({
                     )}
                     {columns.map((column) => (
                       <td key={column.key} className="paginated-table-cell">
-                        {column.func 
+                        {column.func
                           ? column.func(item[column.key], item)
                           : item[column.key] || ''
                         }
@@ -168,7 +168,7 @@ const PaginatedTable: FC<PaginatedTableProps> = ({
           pageSize={pagination.limit}
           showSizeChanger
           showTotal={(total, range) => `${range[0]}-${range[1]} of ${total} transfers`}
-          pageSizeOptions={['100', '200','500','1000']}
+          pageSizeOptions={['50', '100', '200', '500', '1000']}
           onChange={handlePageChange}
           onShowSizeChange={handlePageSizeChange}
         />
