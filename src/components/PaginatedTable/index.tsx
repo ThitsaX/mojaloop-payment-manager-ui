@@ -24,6 +24,8 @@ interface PaginatedTableProps {
   onRowClick?: (item: any) => void;
   onPageChange: (pagination: { offset?: number; cursor?: string; limit: number }) => void;
   showRowNumbers?: boolean;
+  nextCursor?: string; // For cursor-based pagination
+  hasMore?: boolean; // For cursor-based pagination
 }
 
 const PaginatedTable: FC<PaginatedTableProps> = ({
@@ -36,6 +38,8 @@ const PaginatedTable: FC<PaginatedTableProps> = ({
   onRowClick,
   onPageChange,
   showRowNumbers = false,
+  nextCursor,
+  hasMore,
 }) => {
   // Support both offset-based and cursor-based pagination
   const currentPage = pagination.offset !== undefined
@@ -51,9 +55,15 @@ const PaginatedTable: FC<PaginatedTableProps> = ({
       const newOffset = (page - 1) * newPageSize;
       onPageChange({ offset: newOffset, limit: newPageSize });
     } else {
-      // For cursor-based pagination, we can't jump to arbitrary pages
-      // This is handled by Next/Previous buttons with cursor
-      onPageChange({ cursor: pagination.cursor, limit: newPageSize });
+      // For cursor-based pagination
+      // Page direction: page > currentPage means "Next", page < currentPage means "Previous"
+      if (page > currentPage) {
+        // Next page - use nextCursor
+        onPageChange({ cursor: nextCursor, limit: newPageSize });
+      } else {
+        // Previous page - go back to first page (we don't track previous cursors yet)
+        onPageChange({ cursor: undefined, limit: newPageSize });
+      }
     }
   };
 
@@ -177,7 +187,7 @@ const PaginatedTable: FC<PaginatedTableProps> = ({
         </table>
       </div>
 
-      {!isLoadingCount && totalCount > 0 && (
+      {!isLoadingCount && totalCount > 0 && pagination.offset !== undefined && (
         <Pagination
           current={currentPage}
           total={totalCount}
@@ -188,6 +198,30 @@ const PaginatedTable: FC<PaginatedTableProps> = ({
           onChange={handlePageChange}
           onShowSizeChange={handlePageSizeChange}
         />
+      )}
+
+      {/* Cursor-based pagination controls */}
+      {!isLoadingCount && pagination.offset === undefined && data.length > 0 && (
+        <div className="paginated-table-cursor-controls">
+          <button
+            onClick={() => handlePageChange(currentPage - 1)}
+            disabled={!pagination.cursor}
+            className="pagination-button"
+          >
+            Previous
+          </button>
+          <span className="pagination-info">
+            Showing {data.length} transfers
+            {hasMore && ' (more available)'}
+          </span>
+          <button
+            onClick={() => handlePageChange(currentPage + 1)}
+            disabled={!hasMore}
+            className="pagination-button"
+          >
+            Next
+          </button>
+        </div>
       )}
 
       {isLoadingCount && (

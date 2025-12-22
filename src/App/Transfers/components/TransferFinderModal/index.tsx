@@ -248,6 +248,8 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
   isTransfersRequested,
   transfersCount,
   isTransfersCountPending,
+  transfersNextCursor,
+  transfersHasMore,
   apiBaseUrl,
   onFiltersSubmitClick,
   onTransfersSubmitClick,
@@ -842,6 +844,8 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
           onRowClick={onTransferRowClick}
           onPageChange={handlePageChange}
           showRowNumbers={true}
+          nextCursor={transfersNextCursor}
+          hasMore={transfersHasMore}
         />
       </div>
     );
