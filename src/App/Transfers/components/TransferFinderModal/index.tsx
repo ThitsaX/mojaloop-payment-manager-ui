@@ -144,8 +144,9 @@ async function fetchTransferChunk(
         }
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
-      
-      return response.data;
+
+      // Extract transfers array from new API response format {transfers, nextCursor, hasMore}
+      return response.data.transfers || response.data;
     } catch (error) {
       // Network errors or other exceptions
       if (retryCount < maxRetries && (error.code === 'NETWORK_ERROR' || error.message.includes('503') || error.message.includes('502') || error.message.includes('504'))) {
