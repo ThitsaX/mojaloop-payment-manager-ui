@@ -256,7 +256,7 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
   onTransferRowClick,
   onRequestTransfersCount,
 }) => {
-  const [pagination, setPagination] = useState({ cursor: undefined as string | undefined, limit: 20 });
+  const [pagination, setPagination] = useState<{ cursor?: string; limit: number }>({ cursor: undefined, limit: 20 });
   const [retryCount, setRetryCount] = useState(0);
   const [isRetrying, setIsRetrying] = useState(false);
   const [isDownloadingExcel, setIsDownloadingExcel] = useState(false);
@@ -586,7 +586,7 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
   if (!isTransfersRequested) {
     content = <TransferFilters model={model} onFilterChange={onFilterChange} />;
     onSubmit = () => {
-      const initialPagination = { offset: 0, limit: 50 };
+      const initialPagination = { cursor: undefined, limit: 50 };
       setPagination(initialPagination);
       lastRequestParamsRef.current = { filters: model, pagination: initialPagination };
       setRetryCount(0); // Reset retry count for new requests

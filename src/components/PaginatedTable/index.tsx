@@ -14,14 +14,15 @@ interface PaginatedTableProps {
   columns: Column[];
   data: any[];
   pagination: {
-    offset: number;
+    offset?: number;
+    cursor?: string;
     limit: number;
   };
   totalCount: number;
   isLoading?: boolean;
   isLoadingCount?: boolean;
   onRowClick?: (item: any) => void;
-  onPageChange: (pagination: { offset: number; limit: number }) => void;
+  onPageChange: (pagination: { offset?: number; cursor?: string; limit: number }) => void;
   showRowNumbers?: boolean;
 }
 
@@ -36,17 +37,32 @@ const PaginatedTable: FC<PaginatedTableProps> = ({
   onPageChange,
   showRowNumbers = false,
 }) => {
-  const currentPage = Math.floor(pagination.offset / pagination.limit) + 1;
+  // Support both offset-based and cursor-based pagination
+  const currentPage = pagination.offset !== undefined
+    ? Math.floor(pagination.offset / pagination.limit) + 1
+    : 1;
   const [sortConfig, setSortConfig] = useState({ key: '', direction: 'asc' });
 
   const handlePageChange = (page: number, pageSize?: number) => {
     const newPageSize = pageSize || pagination.limit;
-    const newOffset = (page - 1) * newPageSize;
-    onPageChange({ offset: newOffset, limit: newPageSize });
+
+    // If using offset-based pagination
+    if (pagination.offset !== undefined) {
+      const newOffset = (page - 1) * newPageSize;
+      onPageChange({ offset: newOffset, limit: newPageSize });
+    } else {
+      // For cursor-based pagination, we can't jump to arbitrary pages
+      // This is handled by Next/Previous buttons with cursor
+      onPageChange({ cursor: pagination.cursor, limit: newPageSize });
+    }
   };
 
   const handlePageSizeChange = (current: number, size: number) => {
-    onPageChange({ offset: 0, limit: size });
+    if (pagination.offset !== undefined) {
+      onPageChange({ offset: 0, limit: size });
+    } else {
+      onPageChange({ cursor: undefined, limit: size }); // Reset to first page
+    }
   };
 
   const handleSort = (columnKey: string) => {
@@ -133,7 +149,7 @@ const PaginatedTable: FC<PaginatedTableProps> = ({
               </tr>
             ) : (
               sortedData.map((item, index) => {
-                const rowNumber = pagination.offset + index + 1;
+                const rowNumber = (pagination.offset ?? 0) + index + 1;
                 return (
                   <tr
                     key={item.id || index}
