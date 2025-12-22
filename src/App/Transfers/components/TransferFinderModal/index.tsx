@@ -21,6 +21,7 @@ import {
   Button,
   PaginatedTable,
   MessageBox,
+  CursorPagination,
 } from 'components';
 import xlsx from 'xlsx';
 import JSZip from 'jszip';
@@ -265,7 +266,6 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
   const [downloadProgress, setDownloadProgress] = useState({ current: 0, total: 0, stage: 'Initializing...' });
   const [downloadCancelled, setDownloadCancelled] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
-  const [downloadLimitError, setDownloadLimitError] = useState<string | null>(null);
   const [dateFormat, setDateFormat] = useState<'iso' | 'readable'>('iso');
   const maxRetries = 2;
   const MAX_DOWNLOAD_LIMIT = 20000;
@@ -307,18 +307,6 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
       }
     };
   }, []);
-
-  // Show/clear download limit error based on transfer count
-  useEffect(() => {
-    if (transfersCount > MAX_DOWNLOAD_LIMIT && isTransfersRequested && !isTransfersPending) {
-      setDownloadLimitError(
-        `You have ${transfersCount.toLocaleString()} records in your search results, but the maximum allowed for download is ${MAX_DOWNLOAD_LIMIT.toLocaleString()} records. Please narrow your search criteria (date range, filters, etc.) to reduce the number of results.`
-      );
-    } else {
-      setDownloadLimitError(null);
-    }
-  }, [transfersCount, isTransfersRequested, isTransfersPending]);
-
   const handlePageChange = (newPagination: { cursor?: string; limit: number }) => {
     setPagination(newPagination);
     lastRequestParamsRef.current = { filters: model, pagination: newPagination };
@@ -712,16 +700,25 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
   } else {
     content = (
       <div className="transfers__transfers__list">
-        {downloadLimitError && (
-          <MessageBox kind="danger" style={{ marginBottom: '16px' }}>
-            {downloadLimitError}
-          </MessageBox>
-        )}
         {transfers.length > 0 && (
-          <div style={{ marginBottom: '16px' }}>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-              {transfersCount > 50 && (
+          <>
+            {/* Cursor Pagination - Top */}
+            <CursorPagination
+              currentCursor={pagination.cursor}
+              nextCursor={transfersNextCursor}
+              hasMore={transfersHasMore}
+              recordsShown={transfers.length}
+              pageSize={pagination.limit}
+              onPrevious={() => handlePageChange({ cursor: undefined, limit: pagination.limit })}
+              onNext={() => handlePageChange({ cursor: transfersNextCursor, limit: pagination.limit })}
+              onPageSizeChange={(size) => handlePageChange({ cursor: undefined, limit: size })}
+              isLoading={isTransfersPending}
+            />
+
+            <div style={{ marginTop: '16px', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                {transfersCount > 50 && (
                 <Button
                   label={
                     isDownloadingExcel
@@ -743,14 +740,31 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
                 noFill
               />
               </div>
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <span style={{ fontSize: '12px', color: '#6c757d' }}>Date Format:</span>
-                <Button
-                  label={dateFormat === 'iso' ? 'ISO (2025-12-21T08:22:47+07:00)' : 'Readable (21/12/2025 08:22:47)'}
-                  onClick={() => setDateFormat(dateFormat === 'iso' ? 'readable' : 'iso')}
-                  style={{ fontSize: '11px', padding: '4px 8px' }}
-                  noFill
-                />
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <span style={{ fontSize: '12px', color: '#6c757d' }}>Date Format:</span>
+                  <Button
+                    label={dateFormat === 'iso' ? 'ISO (2025-12-21T08:22:47+07:00)' : 'Readable (21/12/2025 08:22:47)'}
+                    onClick={() => setDateFormat(dateFormat === 'iso' ? 'readable' : 'iso')}
+                    style={{ fontSize: '11px', padding: '4px 8px' }}
+                    noFill
+                  />
+                </div>
+                {transfersCount > 50 && (
+                  <span style={{
+                    fontSize: '11px',
+                    color: transfersCount > MAX_DOWNLOAD_LIMIT ? '#d9534f' : '#5bc0de',
+                    padding: '4px 8px',
+                    backgroundColor: transfersCount > MAX_DOWNLOAD_LIMIT ? '#f2dede' : '#d9edf7',
+                    borderRadius: '3px',
+                    border: `1px solid ${transfersCount > MAX_DOWNLOAD_LIMIT ? '#d9534f' : '#5bc0de'}`
+                  }}>
+                    {transfersCount > MAX_DOWNLOAD_LIMIT
+                      ? `⚠ Max download: ${MAX_DOWNLOAD_LIMIT.toLocaleString()} records`
+                      : `ℹ Max download: ${MAX_DOWNLOAD_LIMIT.toLocaleString()} records`
+                    }
+                  </span>
+                )}
               </div>
             </div>
             {/* Download progress display */}
@@ -833,20 +847,22 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
               </div>
             )}
           </div>
+
+          <PaginatedTable
+            columns={transfersColumns}
+            data={transfers}
+            pagination={pagination}
+            totalCount={transfersCount}
+            isLoading={isTransfersPending || isDownloadingExcel}
+            isLoadingCount={isTransfersCountPending}
+            onRowClick={onTransferRowClick}
+            onPageChange={handlePageChange}
+            showRowNumbers={true}
+            nextCursor={transfersNextCursor}
+            hasMore={transfersHasMore}
+          />
+          </>
         )}
-        <PaginatedTable
-          columns={transfersColumns}
-          data={transfers}
-          pagination={pagination}
-          totalCount={transfersCount}
-          isLoading={isTransfersPending || isDownloadingExcel}
-          isLoadingCount={isTransfersCountPending}
-          onRowClick={onTransferRowClick}
-          onPageChange={handlePageChange}
-          showRowNumbers={true}
-          nextCursor={transfersNextCursor}
-          hasMore={transfersHasMore}
-        />
       </div>
     );
     onSubmit = onTransfersSubmitClick;

@@ -56,6 +56,7 @@ import ProgressTabs, { ProgressTab } from './ProgressTab';
 import MetricsChart from './Charts/MetricsChart';
 import Pagination from './Pagination';
 import PaginatedTable from './PaginatedTable';
+import CursorPagination from './CursorPagination';
 
 export {
   Accordion,
@@ -113,4 +114,5 @@ export {
   MetricsChart,
   Pagination,
   PaginatedTable,
+  CursorPagination,
 };

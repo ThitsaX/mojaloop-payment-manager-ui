@@ -203,24 +203,40 @@ const PaginatedTable: FC<PaginatedTableProps> = ({
       {/* Cursor-based pagination controls */}
       {!isLoadingCount && pagination.offset === undefined && data.length > 0 && (
         <div className="paginated-table-cursor-controls">
-          <button
-            onClick={() => handlePageChange(currentPage - 1)}
-            disabled={!pagination.cursor}
-            className="pagination-button"
-          >
-            Previous
-          </button>
-          <span className="pagination-info">
-            Showing {data.length} transfers
-            {hasMore && ' (more available)'}
-          </span>
-          <button
-            onClick={() => handlePageChange(currentPage + 1)}
-            disabled={!hasMore}
-            className="pagination-button"
-          >
-            Next
-          </button>
+          <div className="cursor-nav-buttons">
+            <button
+              onClick={() => handlePageChange(currentPage - 1)}
+              disabled={!pagination.cursor}
+              className="pagination-button"
+            >
+              Previous
+            </button>
+            <span className="pagination-info">
+              Showing {data.length} records
+              {hasMore && ' (more available)'}
+            </span>
+            <button
+              onClick={() => handlePageChange(currentPage + 1)}
+              disabled={!hasMore}
+              className="pagination-button"
+            >
+              Next
+            </button>
+          </div>
+          <div className="cursor-page-size">
+            <span className="page-size-label">Records per page:</span>
+            <select
+              value={pagination.limit}
+              onChange={(e) => handlePageSizeChange(1, parseInt(e.target.value))}
+              className="page-size-select"
+            >
+              <option value="20">20</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+              <option value="200">200</option>
+              <option value="500">500</option>
+            </select>
+          </div>
         </div>
       )}
 
