@@ -40,12 +40,14 @@ const stateProps = (state: State) => ({
   isTransfersRequested: selectors.getIsTransfersRequested(state),
   transfersCount: selectors.getTransfersCount(state),
   isTransfersCountPending: selectors.getIsTransfersCountPending(state),
+  transfersNextCursor: selectors.getTransfersNextCursor(state),
+  transfersHasMore: selectors.getTransfersHasMore(state),
   apiBaseUrl: state.app.config.apiBaseUrl,
 });
 
 const dispatchProps = (dispatch: Dispatch) => ({
   onModalCloseClick: () => dispatch(actions.toggleTransferFinderModal()),
-  onFiltersSubmitClick: (filters: TransferFilter, pagination?: { offset: number; limit: number }) =>
+  onFiltersSubmitClick: (filters: TransferFilter, pagination?: { cursor?: string; limit: number }) =>
     dispatch(actions.requestTransfers({ filters, pagination })),
   onTransfersSubmitClick: () => dispatch(actions.unrequestTransfers()),
   onFilterChange: ({ field, value }: { field: string; value: FilterChangeValue }) =>
@@ -65,8 +67,10 @@ interface TransferFinderModalProps {
   isTransfersRequested: boolean;
   transfersCount: number;
   isTransfersCountPending: boolean;
+  transfersNextCursor?: string;
+  transfersHasMore?: boolean;
   apiBaseUrl: string;
-  onFiltersSubmitClick: (filters: TransferFilter, pagination?: { offset: number; limit: number }) => void;
+  onFiltersSubmitClick: (filters: TransferFilter, pagination?: { cursor?: string; limit: number }) => void;
   onTransfersSubmitClick: () => void;
   onModalCloseClick: () => void;
   onFilterChange: ({ field, value }: { field: string; value: FilterChangeValue }) => void;
@@ -74,10 +78,10 @@ interface TransferFinderModalProps {
   onRequestTransfersCount: (filters: TransferFilter) => void;
 }
 
-function buildTransferApiUrl(filters: TransferFilter, offset: number, limit: number, apiBaseUrl: string): string {
-  const baseUrl = `${apiBaseUrl}/transfers`; 
+function buildTransferApiUrl(filters: TransferFilter, cursor: string | undefined, limit: number, apiBaseUrl: string): string {
+  const baseUrl = `${apiBaseUrl}/transfers`;
   const params = new URLSearchParams();
-  
+
   if (filters.transferId) {
     params.append('id', String(filters.transferId));
   } else {
@@ -90,8 +94,8 @@ function buildTransferApiUrl(filters: TransferFilter, offset: number, limit: num
     if (filters.institution) params.append('institution', String(filters.institution));
     if (filters.status) params.append('status', String(filters.status));
   }
-  
-  params.append('offset', offset.toString());
+
+  if (cursor) params.append('cursor', cursor);
   params.append('limit', limit.toString());
   
   const fullUrl = `${baseUrl}?${params.toString()}`;
@@ -100,19 +104,21 @@ function buildTransferApiUrl(filters: TransferFilter, offset: number, limit: num
 }
 
 // Helper function to fetch transfers data for a specific chunk using direct fetch
+// TODO: Refactor to use sequential cursor iteration instead of parallel offset-based chunks
 async function fetchTransferChunk(
-  filters: TransferFilter, 
-  offset: number, 
+  filters: TransferFilter,
+  offset: number,
   limit: number,
   apiBaseUrl: string,
   maxRetries: number = 2,
   progressCallback?: (stage: string) => void
 ): Promise<any[]> {
   let retryCount = 0;
-  
+
   while (retryCount <= maxRetries) {
     try {
-      const url = buildTransferApiUrl(filters, offset, limit, apiBaseUrl);
+      // TEMPORARY: Still using offset for Excel downloads until sequential cursor iteration is implemented
+      const url = buildTransferApiUrl(filters, undefined, limit, apiBaseUrl);
       
       const response = await axios({
         method: 'get',
@@ -250,7 +256,7 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
   onTransferRowClick,
   onRequestTransfersCount,
 }) => {
-  const [pagination, setPagination] = useState({ offset: 0, limit: 20 });
+  const [pagination, setPagination] = useState({ cursor: undefined as string | undefined, limit: 20 });
   const [retryCount, setRetryCount] = useState(0);
   const [isRetrying, setIsRetrying] = useState(false);
   const [isDownloadingExcel, setIsDownloadingExcel] = useState(false);
@@ -263,7 +269,7 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
   const MAX_DOWNLOAD_LIMIT = 20000;
   const RECORDS_PER_FILE = 2500; // Max 3000 records per Excel file
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const lastRequestParamsRef = useRef<{ filters: TransferFilter; pagination?: { offset: number; limit: number } } | null>(null);
+  const lastRequestParamsRef = useRef<{ filters: TransferFilter; pagination?: { cursor?: string; limit: number } } | null>(null);
   const downloadCancelledRef = useRef<boolean>(false);
 
   useEffect(() => {
@@ -311,7 +317,7 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
     }
   }, [transfersCount, isTransfersRequested, isTransfersPending]);
 
-  const handlePageChange = (newPagination: { offset: number; limit: number }) => {
+  const handlePageChange = (newPagination: { cursor?: string; limit: number }) => {
     setPagination(newPagination);
     lastRequestParamsRef.current = { filters: model, pagination: newPagination };
     setRetryCount(0); // Reset retry count for new requests

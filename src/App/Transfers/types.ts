@@ -345,6 +345,8 @@ export interface TransfersState {
   isTransfersRequested: boolean;
   transfers: Transfer[];
   transfersError: ErrorMessage;
+  transfersNextCursor?: string; // Next cursor for pagination
+  transfersHasMore?: boolean; // Indicates if more results available
   transfersCount: number;
   isTransfersCountPending: boolean;
   transfersCountError: ErrorMessage;
@@ -420,7 +422,7 @@ export interface RequestTransfersAction {
   type: typeof REQUEST_TRANSFERS;
   filters: TransferFilter;
   pagination?: {
-    offset: number;
+    cursor?: string; // Cursor for cursor-based pagination
     limit: number;
   };
 }
@@ -432,6 +434,8 @@ export interface UnrequestTransfersAction {
 export interface SetTransfersAction {
   type: typeof SET_TRANSFERS;
   data: Transfer[];
+  nextCursor?: string; // Cursor for next page
+  hasMore?: boolean; // Indicates if there are more results
 }
 
 export interface SetTransfersErrorAction {

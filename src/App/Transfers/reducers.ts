@@ -72,6 +72,8 @@ export const initialState: TransfersState = {
   isTransfersRequested: false,
   transfers: [],
   transfersError: null,
+  transfersNextCursor: undefined,
+  transfersHasMore: undefined,
   transfersCount: 0,
   isTransfersCountPending: false,
   transfersCountError: null,
@@ -170,6 +172,8 @@ export default function transfersReducer(
       return {
         ...state,
         transfers: action.data,
+        transfersNextCursor: action.nextCursor,
+        transfersHasMore: action.hasMore,
         transfersError: null, // Clear error on successful fetch
       };
     case SET_TRANSFERS_ERROR:
