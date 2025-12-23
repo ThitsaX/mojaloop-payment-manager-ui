@@ -289,16 +289,20 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
         setRetryCount(prev => prev + 1);
         const { filters, pagination: retryPagination } = lastRequestParamsRef.current!;
         onFiltersSubmitClick(filters, retryPagination);
-        setIsRetrying(false);
       }, 1000); // Wait 1 second before retry
     }
   }, [transfersError, isTransfersPending, retryCount, maxRetries, onFiltersSubmitClick, isRetrying]);
 
+  // Reset retry state when request completes successfully or max retries reached
   useEffect(() => {
     if (!transfersError && !isTransfersPending && retryCount > 0) {
       setRetryCount(0);
+      setIsRetrying(false);
     }
-  }, [transfersError, isTransfersPending, retryCount]);
+    if (retryCount >= maxRetries) {
+      setIsRetrying(false);
+    }
+  }, [transfersError, isTransfersPending, retryCount, maxRetries]);
 
   // Cleanup timeout
   useEffect(() => {
