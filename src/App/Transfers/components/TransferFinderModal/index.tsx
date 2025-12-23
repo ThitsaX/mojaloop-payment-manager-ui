@@ -132,8 +132,8 @@ async function fetchTransferChunk(
       });
       
       if (response.status < 200 || response.status >= 300) {
-        // Check if this is a retryable error (503, 502, 504, network errors)
-        if ((response.status === 503 || response.status === 502 || response.status === 504) && retryCount < maxRetries) {
+        // Check if this is a retryable error (401, 502, 503, 504, network errors)
+        if ((response.status === 401 || response.status === 502 || response.status === 503 || response.status === 504) && retryCount < maxRetries) {
           retryCount++;
           if (progressCallback) {
             progressCallback(`Retrying chunk (offset: ${offset}) - attempt ${retryCount}/${maxRetries}`);
@@ -149,7 +149,7 @@ async function fetchTransferChunk(
       return response.data.transfers || response.data;
     } catch (error) {
       // Network errors or other exceptions
-      if (retryCount < maxRetries && (error.code === 'NETWORK_ERROR' || error.message.includes('503') || error.message.includes('502') || error.message.includes('504'))) {
+      if (retryCount < maxRetries && (error.code === 'NETWORK_ERROR' || error.message.includes('401') || error.message.includes('502') || error.message.includes('503') || error.message.includes('504'))) {
         retryCount++;
         if (progressCallback) {
           progressCallback(`Retrying chunk (offset: ${offset}) - attempt ${retryCount}/${maxRetries}`);
@@ -653,7 +653,7 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
 
       // Error state with retry information
       if (transfersError) {
-        const isRetryableError = transfersError?.includes('503');
+        const isRetryableError = transfersError?.includes('401') || transfersError?.includes('502') || transfersError?.includes('503') || transfersError?.includes('504');
         return (
           <div style={{
             background: retryCount >= maxRetries ? '#f8d7da' : '#fff3cd',
