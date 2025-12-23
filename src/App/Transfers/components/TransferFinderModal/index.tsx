@@ -701,6 +701,32 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
   } else {
     content = (
       <div className="transfers__transfers__list">
+        {/* Search Results Count */}
+        {isTransfersRequested && !isTransfersCountPending && (
+          <div style={{
+            padding: '12px 16px',
+            backgroundColor: '#f8f9fa',
+            border: '1px solid #dee2e6',
+            borderRadius: '4px',
+            marginBottom: '16px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}>
+            <div style={{ fontSize: '14px', fontWeight: 500, color: '#212529' }}>
+              {transfersCount === 0 ? (
+                <span style={{ color: '#6c757d' }}>No records found</span>
+              ) : (
+                <>
+                  <span style={{ color: '#495057' }}>Search Results: </span>
+                  <span style={{ color: '#007bff', fontSize: '16px' }}>{transfersCount.toLocaleString()}</span>
+                  <span style={{ color: '#6c757d', fontSize: '13px' }}> {transfersCount === 1 ? 'record' : 'records'}</span>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
         {transfers.length > 0 && (
           <>
             {/* Cursor Pagination - Top */}
