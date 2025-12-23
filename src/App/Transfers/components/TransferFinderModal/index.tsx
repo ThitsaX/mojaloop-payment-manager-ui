@@ -261,6 +261,8 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
   onRequestTransfersCount,
 }) => {
   const [pagination, setPagination] = useState<{ cursor?: string; limit: number }>({ cursor: undefined, limit: 20 });
+  const [cursorHistory, setCursorHistory] = useState<(string | undefined)[]>([undefined]); // Stack of cursors for backward navigation
+  const [currentPageIndex, setCurrentPageIndex] = useState(0); // Track current page position
   const [retryCount, setRetryCount] = useState(0);
   const [isRetrying, setIsRetrying] = useState(false);
   const [isDownloadingExcel, setIsDownloadingExcel] = useState(false);
@@ -312,11 +314,45 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
       }
     };
   }, []);
-  const handlePageChange = (newPagination: { cursor?: string; limit: number }) => {
-    setPagination(newPagination);
-    lastRequestParamsRef.current = { filters: model, pagination: newPagination };
-    setRetryCount(0); // Reset retry count for new requests
-    onFiltersSubmitClick(model, newPagination);
+  const handlePageChange = (direction: 'next' | 'previous' | 'pageSize', newLimit?: number) => {
+    const limit = newLimit || pagination.limit;
+
+    if (direction === 'next') {
+      // Going forward
+      const newCursor = transfersNextCursor;
+      const newPageIndex = currentPageIndex + 1;
+
+      // Add new cursor to history if we're moving to a new page
+      if (newPageIndex === cursorHistory.length) {
+        setCursorHistory([...cursorHistory, newCursor]);
+      }
+
+      setCurrentPageIndex(newPageIndex);
+      setPagination({ cursor: newCursor, limit });
+      lastRequestParamsRef.current = { filters: model, pagination: { cursor: newCursor, limit } };
+      setRetryCount(0);
+      onFiltersSubmitClick(model, { cursor: newCursor, limit });
+
+    } else if (direction === 'previous') {
+      // Going backward
+      const newPageIndex = Math.max(0, currentPageIndex - 1);
+      const previousCursor = cursorHistory[newPageIndex];
+
+      setCurrentPageIndex(newPageIndex);
+      setPagination({ cursor: previousCursor, limit });
+      lastRequestParamsRef.current = { filters: model, pagination: { cursor: previousCursor, limit } };
+      setRetryCount(0);
+      onFiltersSubmitClick(model, { cursor: previousCursor, limit });
+
+    } else if (direction === 'pageSize') {
+      // Page size changed - reset to first page
+      setCursorHistory([undefined]);
+      setCurrentPageIndex(0);
+      setPagination({ cursor: undefined, limit });
+      lastRequestParamsRef.current = { filters: model, pagination: { cursor: undefined, limit } };
+      setRetryCount(0);
+      onFiltersSubmitClick(model, { cursor: undefined, limit });
+    }
   };
 
   const handleManualRetry = useCallback(() => {
@@ -583,6 +619,8 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
     onSubmit = () => {
       const initialPagination = { cursor: undefined, limit: 50 };
       setPagination(initialPagination);
+      setCursorHistory([undefined]); // Reset cursor history for new search
+      setCurrentPageIndex(0); // Reset to first page
       lastRequestParamsRef.current = { filters: model, pagination: initialPagination };
       setRetryCount(0); // Reset retry count for new requests
       onFiltersSubmitClick(model, initialPagination);
@@ -740,9 +778,9 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
               hasMore={transfersHasMore}
               recordsShown={transfers.length}
               pageSize={pagination.limit}
-              onPrevious={() => handlePageChange({ cursor: undefined, limit: pagination.limit })}
-              onNext={() => handlePageChange({ cursor: transfersNextCursor, limit: pagination.limit })}
-              onPageSizeChange={(size) => handlePageChange({ cursor: undefined, limit: size })}
+              onPrevious={() => handlePageChange('previous')}
+              onNext={() => handlePageChange('next')}
+              onPageSizeChange={(size) => handlePageChange('pageSize', size)}
               isLoading={isTransfersPending}
             />
 
@@ -887,7 +925,7 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
             isLoading={isTransfersPending || isDownloadingExcel}
             isLoadingCount={isTransfersCountPending}
             onRowClick={onTransferRowClick}
-            onPageChange={handlePageChange}
+            onPageChange={() => {}} // No-op: CursorPagination handles navigation
             showRowNumbers={false}
             nextCursor={transfersNextCursor}
             hasMore={transfersHasMore}
