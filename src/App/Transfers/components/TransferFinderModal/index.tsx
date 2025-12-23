@@ -858,7 +858,7 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
             isLoadingCount={isTransfersCountPending}
             onRowClick={onTransferRowClick}
             onPageChange={handlePageChange}
-            showRowNumbers={true}
+            showRowNumbers={false}
             nextCursor={transfersNextCursor}
             hasMore={transfersHasMore}
           />
