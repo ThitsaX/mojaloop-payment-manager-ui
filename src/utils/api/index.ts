@@ -20,6 +20,30 @@ const methodMaps: { [key in MethodName]: Method } = {
   delete: 'delete',
 };
 
+// Track pending 401 redirect to allow retries to work
+let unauthorizedRedirectTimeout: NodeJS.Timeout | null = null;
+
+function scheduleUnauthorizedRedirect<State>(state: State, config: Config<string, State>) {
+  // Clear any existing redirect timeout
+  if (unauthorizedRedirectTimeout) {
+    clearTimeout(unauthorizedRedirectTimeout);
+  }
+
+  // Schedule redirect after 3 seconds to allow retry logic to work
+  unauthorizedRedirectTimeout = setTimeout(() => {
+    const redirectRurl = `/login?redirect=${window.location.href}`;
+    const redirectUrl = getUrl<State>(config.service.baseUrl, state, {}, redirectRurl);
+    window.location.href = redirectUrl;
+  }, 3000);
+}
+
+function cancelUnauthorizedRedirect() {
+  if (unauthorizedRedirectTimeout) {
+    clearTimeout(unauthorizedRedirectTimeout);
+    unauthorizedRedirectTimeout = null;
+  }
+}
+
 function getUrl<State>(
   baseUrl: UrlConfig<State>,
   state: State,
@@ -74,6 +98,14 @@ function run<State>(endpointName: string, methodName: MethodName, config: Config
         : response.data;
 
       yield put(unsetRequestPending(endpointName, methodName));
+
+      // Handle authentication errors with delayed redirect to allow retry logic to work
+      if (response.status === 401) {
+        scheduleUnauthorizedRedirect<State>(state, config);
+      } else if (response.status >= 200 && response.status < 300) {
+        // Cancel any pending redirect if we get a successful response
+        cancelUnauthorizedRedirect();
+      }
 
       return { status: response.status, data: transformedResponse };
     } catch (e) {
