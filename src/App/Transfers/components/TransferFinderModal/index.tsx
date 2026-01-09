@@ -480,7 +480,7 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
 
           try {
             // Fetch data for this chunk using cursor with progress callback for retry information
-            const result = await fetchTransferChunk(
+            const result:any = await fetchTransferChunk(
               model,
               currentCursor, // Use cursor from previous iteration
               recordsToFetch,
