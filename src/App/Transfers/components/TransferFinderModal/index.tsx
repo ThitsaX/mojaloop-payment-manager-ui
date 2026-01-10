@@ -278,7 +278,7 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
   const [dateRangeError, setDateRangeError] = useState<string | null>(null);
   const maxRetries = 2;
   const MAX_DOWNLOAD_LIMIT = 20000;
-  const MAX_DATE_RANGE_DAYS = 90; // 3 months maximum
+  const MAX_DATE_RANGE_DAYS = 30; // 1 month maximum
   const RECORDS_PER_FILE = 2500; // Max records per Excel file in ZIP
   const DOWNLOAD_CHUNK_SIZE = 1000; // Records to fetch per API call during download (not used yet, but planned)
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -1147,7 +1147,7 @@ const TransferFilters: FC<TransferFiltersProps> = ({ model, onFilterChange, date
                 gap: '8px'
               }}>
                 <span style={{ fontSize: '14px' }}>ℹ️</span>
-                <span>Custom date ranges are limited to 90 days (3 months) maximum to ensure optimal performance.</span>
+                <span>Custom date ranges are limited to 30 days maximum.</span>
               </div>
             )}
           </Column>
