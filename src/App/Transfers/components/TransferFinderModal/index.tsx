@@ -278,7 +278,7 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
   const [dateRangeError, setDateRangeError] = useState<string | null>(null);
   const maxRetries = 2;
   const MAX_DOWNLOAD_LIMIT = 20000;
-  const MAX_DATE_RANGE_DAYS = 30; // 1 month maximum
+  const MAX_DATE_RANGE_DAYS = 32; // 1 month maximum (31 days + endOf day time component)
   const RECORDS_PER_FILE = 2500; // Max records per Excel file in ZIP
   const DOWNLOAD_CHUNK_SIZE = 1000; // Records to fetch per API call during download (not used yet, but planned)
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -1094,6 +1094,23 @@ const TransferFilters: FC<TransferFiltersProps> = ({ model, onFilterChange, date
             <span>{dateRangeError}</span>
           </div>
         )}
+        {model.dates === 'CUSTOM' && !dateRangeError && (model.from || model.to) && (
+          <div style={{
+            marginBottom: '16px',
+            padding: '10px 14px',
+            backgroundColor: '#fff3cd',
+            border: '1px solid #ffc107',
+            borderRadius: '4px',
+            color: '#856404',
+            fontSize: '12px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <span style={{ fontSize: '14px' }}>ℹ️</span>
+            <span>Custom date ranges are limited to 1 month maximum.</span>
+          </div>
+        )}
         <br />
         <Row>
           <Column>
@@ -1133,23 +1150,6 @@ const TransferFilters: FC<TransferFiltersProps> = ({ model, onFilterChange, date
                 />
               </Column>
             </Row>
-            {model.dates === 'CUSTOM' && !dateRangeError && (model.from || model.to) && (
-              <div style={{
-                marginTop: '12px',
-                padding: '10px 14px',
-                backgroundColor: '#fff3cd',
-                border: '1px solid #ffc107',
-                borderRadius: '4px',
-                color: '#856404',
-                fontSize: '12px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
-              }}>
-                <span style={{ fontSize: '14px' }}>ℹ️</span>
-                <span>Custom date ranges are limited to 30 days maximum.</span>
-              </div>
-            )}
           </Column>
           <Column style={{ paddingLeft: '20px' }}>
             <FormInput
