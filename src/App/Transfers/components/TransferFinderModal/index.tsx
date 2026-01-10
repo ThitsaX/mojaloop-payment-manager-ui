@@ -1077,6 +1077,23 @@ const TransferFilters: FC<TransferFiltersProps> = ({ model, onFilterChange, date
       <TabPanel>
         <DataLabel size="l">Filter transfers:</DataLabel>
         <br />
+        {dateRangeError && (
+          <div style={{
+            marginBottom: '16px',
+            padding: '12px 16px',
+            backgroundColor: '#f8d7da',
+            border: '1px solid #f5c6cb',
+            borderRadius: '4px',
+            color: '#721c24',
+            fontSize: '13px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <span style={{ fontSize: '16px' }}>⚠️</span>
+            <span>{dateRangeError}</span>
+          </div>
+        )}
         <br />
         <Row>
           <Column>
@@ -1116,23 +1133,6 @@ const TransferFilters: FC<TransferFiltersProps> = ({ model, onFilterChange, date
                 />
               </Column>
             </Row>
-            {dateRangeError && (
-              <div style={{
-                marginTop: '12px',
-                padding: '12px 16px',
-                backgroundColor: '#f8d7da',
-                border: '1px solid #f5c6cb',
-                borderRadius: '4px',
-                color: '#721c24',
-                fontSize: '13px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
-              }}>
-                <span style={{ fontSize: '16px' }}>⚠️</span>
-                <span>{dateRangeError}</span>
-              </div>
-            )}
             {model.dates === 'CUSTOM' && !dateRangeError && (model.from || model.to) && (
               <div style={{
                 marginTop: '12px',
