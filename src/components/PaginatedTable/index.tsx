@@ -26,6 +26,7 @@ interface PaginatedTableProps {
   showRowNumbers?: boolean;
   nextCursor?: string; // For cursor-based pagination
   hasMore?: boolean; // For cursor-based pagination
+  hidePagination?: boolean; // Hide built-in pagination controls
 }
 
 const PaginatedTable: FC<PaginatedTableProps> = ({
@@ -40,6 +41,7 @@ const PaginatedTable: FC<PaginatedTableProps> = ({
   showRowNumbers = false,
   nextCursor,
   hasMore,
+  hidePagination = false,
 }) => {
   // Support both offset-based and cursor-based pagination
   const currentPage = pagination.offset !== undefined
@@ -187,7 +189,7 @@ const PaginatedTable: FC<PaginatedTableProps> = ({
         </table>
       </div>
 
-      {!isLoadingCount && totalCount > 0 && pagination.offset !== undefined && (
+      {!hidePagination && !isLoadingCount && totalCount > 0 && pagination.offset !== undefined && (
         <Pagination
           current={currentPage}
           total={totalCount}
@@ -201,7 +203,7 @@ const PaginatedTable: FC<PaginatedTableProps> = ({
       )}
 
       {/* Cursor-based pagination controls */}
-      {!isLoadingCount && pagination.offset === undefined && data.length > 0 && (
+      {!hidePagination && !isLoadingCount && pagination.offset === undefined && data.length > 0 && (
         <div className="paginated-table-cursor-controls">
           <div className="cursor-nav-buttons">
             <button

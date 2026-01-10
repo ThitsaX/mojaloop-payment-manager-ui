@@ -961,13 +961,14 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
           <PaginatedTable
             columns={transfersColumns}
             data={transfers}
-            pagination={{ offset: 0, limit: pagination.limit }}
+            pagination={{ limit: pagination.limit }}
             totalCount={transfersCount}
             isLoading={isTransfersPending || isDownloadingExcel}
             isLoadingCount={isTransfersCountPending}
             onRowClick={onTransferRowClick}
             onPageChange={() => {}}
             showRowNumbers={false}
+            hidePagination={true}
           />
 
           {/* Cursor Pagination - Bottom */}
