@@ -133,10 +133,20 @@ export function setTransferFinderFilter({
   };
 }
 
-export function setTransfers({ data }: { data: Transfer[] }): SetTransfersAction {
+export function setTransfers({
+  data,
+  nextCursor,
+  hasMore
+}: {
+  data: Transfer[];
+  nextCursor?: string;
+  hasMore?: boolean;
+}): SetTransfersAction {
   return {
     type: SET_TRANSFERS,
     data,
+    nextCursor,
+    hasMore,
   };
 }
 
@@ -147,12 +157,12 @@ export function setTransfersError({ error }: { error: string }): SetTransfersErr
   };
 }
 
-export function requestTransfers({ 
-  filters, 
-  pagination 
-}: { 
+export function requestTransfers({
+  filters,
+  pagination
+}: {
   filters: TransferFilter;
-  pagination?: { offset: number; limit: number };
+  pagination?: { cursor?: string; limit: number };
 }): RequestTransfersAction {
   return {
     type: REQUEST_TRANSFERS,

@@ -21,6 +21,7 @@ import {
   Button,
   PaginatedTable,
   MessageBox,
+  CursorPagination,
 } from 'components';
 import xlsx from 'xlsx';
 import JSZip from 'jszip';
@@ -40,12 +41,14 @@ const stateProps = (state: State) => ({
   isTransfersRequested: selectors.getIsTransfersRequested(state),
   transfersCount: selectors.getTransfersCount(state),
   isTransfersCountPending: selectors.getIsTransfersCountPending(state),
+  transfersNextCursor: selectors.getTransfersNextCursor(state),
+  transfersHasMore: selectors.getTransfersHasMore(state),
   apiBaseUrl: state.app.config.apiBaseUrl,
 });
 
 const dispatchProps = (dispatch: Dispatch) => ({
   onModalCloseClick: () => dispatch(actions.toggleTransferFinderModal()),
-  onFiltersSubmitClick: (filters: TransferFilter, pagination?: { offset: number; limit: number }) =>
+  onFiltersSubmitClick: (filters: TransferFilter, pagination?: { cursor?: string; limit: number }) =>
     dispatch(actions.requestTransfers({ filters, pagination })),
   onTransfersSubmitClick: () => dispatch(actions.unrequestTransfers()),
   onFilterChange: ({ field, value }: { field: string; value: FilterChangeValue }) =>
@@ -65,8 +68,10 @@ interface TransferFinderModalProps {
   isTransfersRequested: boolean;
   transfersCount: number;
   isTransfersCountPending: boolean;
+  transfersNextCursor?: string;
+  transfersHasMore?: boolean;
   apiBaseUrl: string;
-  onFiltersSubmitClick: (filters: TransferFilter, pagination?: { offset: number; limit: number }) => void;
+  onFiltersSubmitClick: (filters: TransferFilter, pagination?: { cursor?: string; limit: number }) => void;
   onTransfersSubmitClick: () => void;
   onModalCloseClick: () => void;
   onFilterChange: ({ field, value }: { field: string; value: FilterChangeValue }) => void;
@@ -74,10 +79,10 @@ interface TransferFinderModalProps {
   onRequestTransfersCount: (filters: TransferFilter) => void;
 }
 
-function buildTransferApiUrl(filters: TransferFilter, offset: number, limit: number, apiBaseUrl: string): string {
-  const baseUrl = `${apiBaseUrl}/transfers`; 
+function buildTransferApiUrl(filters: TransferFilter, cursor: string | undefined, limit: number, apiBaseUrl: string): string {
+  const baseUrl = `${apiBaseUrl}/transfers`;
   const params = new URLSearchParams();
-  
+
   if (filters.transferId) {
     params.append('id', String(filters.transferId));
   } else {
@@ -90,8 +95,8 @@ function buildTransferApiUrl(filters: TransferFilter, offset: number, limit: num
     if (filters.institution) params.append('institution', String(filters.institution));
     if (filters.status) params.append('status', String(filters.status));
   }
-  
-  params.append('offset', offset.toString());
+
+  if (cursor) params.append('cursor', cursor);
   params.append('limit', limit.toString());
   
   const fullUrl = `${baseUrl}?${params.toString()}`;
@@ -99,21 +104,23 @@ function buildTransferApiUrl(filters: TransferFilter, offset: number, limit: num
   return fullUrl;
 }
 
-// Helper function to fetch transfers data for a specific chunk using direct fetch
+// Helper function to fetch transfers data using cursor-based pagination
+// Returns both the data and the next cursor for sequential iteration
 async function fetchTransferChunk(
-  filters: TransferFilter, 
-  offset: number, 
+  filters: TransferFilter,
+  cursor: string | undefined,
   limit: number,
   apiBaseUrl: string,
   maxRetries: number = 2,
   progressCallback?: (stage: string) => void
-): Promise<any[]> {
+): Promise<{ transfers: any[]; nextCursor?: string; hasMore?: boolean }> {
   let retryCount = 0;
-  
+
   while (retryCount <= maxRetries) {
     try {
-      const url = buildTransferApiUrl(filters, offset, limit, apiBaseUrl);
-      
+      // Use cursor-based pagination for consistent, sequential downloads
+      const url = buildTransferApiUrl(filters, cursor, limit, apiBaseUrl);
+
       const response = await axios({
         method: 'get',
         url,
@@ -123,13 +130,13 @@ async function fetchTransferChunk(
         withCredentials: true,
         validateStatus: () => true,
       });
-      
+
       if (response.status < 200 || response.status >= 300) {
-        // Check if this is a retryable error (503, 502, 504, network errors)
-        if ((response.status === 503 || response.status === 502 || response.status === 504) && retryCount < maxRetries) {
+        // Check if this is a retryable error (401, 502, 503, 504, network errors)
+        if ((response.status === 401 || response.status === 502 || response.status === 503 || response.status === 504) && retryCount < maxRetries) {
           retryCount++;
           if (progressCallback) {
-            progressCallback(`Retrying chunk (offset: ${offset}) - attempt ${retryCount}/${maxRetries}`);
+            progressCallback(`Retrying chunk (cursor: ${cursor || 'initial'}) - attempt ${retryCount}/${maxRetries}`);
           }
           // Exponential backoff: wait 1s, then 2s
           await new Promise(resolve => setTimeout(resolve, Math.pow(2, retryCount - 1) * 1000));
@@ -137,40 +144,55 @@ async function fetchTransferChunk(
         }
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
-      
-      return response.data;
+
+      // Extract transfers array and pagination metadata from API response
+      const responseData = response.data;
+      return {
+        transfers: responseData.transfers || responseData,
+        nextCursor: responseData.nextCursor,
+        hasMore: responseData.hasMore
+      };
     } catch (error) {
       // Network errors or other exceptions
-      if (retryCount < maxRetries && (error.code === 'NETWORK_ERROR' || error.message.includes('503') || error.message.includes('502') || error.message.includes('504'))) {
+      if (retryCount < maxRetries && (error.code === 'NETWORK_ERROR' || error.message.includes('401') || error.message.includes('502') || error.message.includes('503') || error.message.includes('504'))) {
         retryCount++;
         if (progressCallback) {
-          progressCallback(`Retrying chunk (offset: ${offset}) - attempt ${retryCount}/${maxRetries}`);
+          progressCallback(`Retrying chunk (cursor: ${cursor || 'initial'}) - attempt ${retryCount}/${maxRetries}`);
         }
         // Exponential backoff: wait 1s, then 2s
         await new Promise(resolve => setTimeout(resolve, Math.pow(2, retryCount - 1) * 1000));
         continue;
       }
-      throw new Error(`Failed to fetch chunk (offset: ${offset}): ${error.message}`);
+      throw new Error(`Failed to fetch chunk (cursor: ${cursor || 'initial'}): ${error.message}`);
     }
   }
-  
-  throw new Error(`Failed to fetch chunk (offset: ${offset}) after ${maxRetries} retries`);
+
+  throw new Error(`Failed to fetch chunk (cursor: ${cursor || 'initial'}) after ${maxRetries} retries`);
 }
 
 // Helper function to generate Excel file for a chunk
 function generateExcelFileForChunk(
-  transfers: any[], 
-  chunkIndex: number
+  transfers: any[],
+  chunkIndex: number,
+  dateFormat: 'iso' | 'readable' = 'iso'
 ): { filename: string; content: ArrayBuffer } {
-  const ws = xlsx.utils.json_to_sheet(transfers);
+  // Format dates in transfer data before creating Excel
+  const formattedTransfers = transfers.map(transfer => ({
+    ...transfer,
+    initiatedTimestamp: transfer.initiatedTimestamp
+      ? helpers.toTransfersDate(transfer.initiatedTimestamp, dateFormat)
+      : transfer.initiatedTimestamp
+  }));
+
+  const ws = xlsx.utils.json_to_sheet(formattedTransfers);
   const wscols = [{ wch: 20 }];
   ws['!cols'] = wscols;
   const wb = xlsx.utils.book_new();
   xlsx.utils.book_append_sheet(wb, ws, 'Transfers');
-  
+
   const filename = `Payment_Manager_Transfers_Part${chunkIndex.toString().padStart(2, '0')}.xlsx`;
   const content = xlsx.write(wb, { bookType: 'xlsx', type: 'array' });
-  
+
   return { filename, content };
 }
 
@@ -204,8 +226,19 @@ async function downloadZipFile(
 }
 
 // Legacy single-page download function (kept for backward compatibility)
-async function downloadTransfersToExcel(transfers: any): Promise<void> {
-  const ws = xlsx.utils.json_to_sheet(transfers);
+async function downloadTransfersToExcel(
+  transfers: any,
+  dateFormat: 'iso' | 'readable' = 'iso'
+): Promise<void> {
+  // Format dates in transfer data before creating Excel
+  const formattedTransfers = transfers.map((transfer: any) => ({
+    ...transfer,
+    initiatedTimestamp: transfer.initiatedTimestamp
+      ? helpers.toTransfersDate(transfer.initiatedTimestamp, dateFormat)
+      : transfer.initiatedTimestamp
+  }));
+
+  const ws = xlsx.utils.json_to_sheet(formattedTransfers);
   const wscols = [{ wch: 20 }];
   ws['!cols'] = wscols;
   const wb = xlsx.utils.book_new();
@@ -222,6 +255,8 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
   isTransfersRequested,
   transfersCount,
   isTransfersCountPending,
+  transfersNextCursor,
+  transfersHasMore,
   apiBaseUrl,
   onFiltersSubmitClick,
   onTransfersSubmitClick,
@@ -230,19 +265,24 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
   onTransferRowClick,
   onRequestTransfersCount,
 }) => {
-  const [pagination, setPagination] = useState({ offset: 0, limit: 20 });
+  const [pagination, setPagination] = useState<{ cursor?: string; limit: number }>({ cursor: undefined, limit: 20 });
+  const [cursorHistory, setCursorHistory] = useState<(string | undefined)[]>([undefined]); // Stack of cursors for backward navigation
+  const [currentPageIndex, setCurrentPageIndex] = useState(0); // Track current page position
   const [retryCount, setRetryCount] = useState(0);
   const [isRetrying, setIsRetrying] = useState(false);
   const [isDownloadingExcel, setIsDownloadingExcel] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState({ current: 0, total: 0, stage: 'Initializing...' });
   const [downloadCancelled, setDownloadCancelled] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
-  const [downloadLimitError, setDownloadLimitError] = useState<string | null>(null);
+  const [dateFormat, setDateFormat] = useState<'iso' | 'readable'>('iso');
+  const [dateRangeError, setDateRangeError] = useState<string | null>(null);
   const maxRetries = 2;
-  const MAX_DOWNLOAD_LIMIT = 15000;
-  const RECORDS_PER_FILE = 3000; // Max 10K records per Excel file
+  const MAX_DOWNLOAD_LIMIT = 20000;
+  const MAX_DATE_RANGE_DAYS = 32; // 1 month maximum (31 days + endOf day time component)
+  const RECORDS_PER_FILE = 2500; // Max records per Excel file in ZIP
+  const DOWNLOAD_CHUNK_SIZE = 1000; // Records to fetch per API call during download (not used yet, but planned)
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const lastRequestParamsRef = useRef<{ filters: TransferFilter; pagination?: { offset: number; limit: number } } | null>(null);
+  const lastRequestParamsRef = useRef<{ filters: TransferFilter; pagination?: { cursor?: string; limit: number } } | null>(null);
   const downloadCancelledRef = useRef<boolean>(false);
 
   useEffect(() => {
@@ -259,16 +299,20 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
         setRetryCount(prev => prev + 1);
         const { filters, pagination: retryPagination } = lastRequestParamsRef.current!;
         onFiltersSubmitClick(filters, retryPagination);
-        setIsRetrying(false);
       }, 1000); // Wait 1 second before retry
     }
   }, [transfersError, isTransfersPending, retryCount, maxRetries, onFiltersSubmitClick, isRetrying]);
 
+  // Reset retry state when request completes successfully or max retries reached
   useEffect(() => {
     if (!transfersError && !isTransfersPending && retryCount > 0) {
       setRetryCount(0);
+      setIsRetrying(false);
     }
-  }, [transfersError, isTransfersPending, retryCount]);
+    if (retryCount >= maxRetries) {
+      setIsRetrying(false);
+    }
+  }, [transfersError, isTransfersPending, retryCount, maxRetries]);
 
   // Cleanup timeout
   useEffect(() => {
@@ -278,23 +322,45 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
       }
     };
   }, []);
+  const handlePageChange = (direction: 'next' | 'previous' | 'pageSize', newLimit?: number) => {
+    const limit = newLimit || pagination.limit;
 
-  // Show/clear download limit error based on transfer count
-  useEffect(() => {
-    if (transfersCount > MAX_DOWNLOAD_LIMIT && isTransfersRequested && !isTransfersPending) {
-      setDownloadLimitError(
-        `You have ${transfersCount.toLocaleString()} records in your search results, but the maximum allowed for download is ${MAX_DOWNLOAD_LIMIT.toLocaleString()} records. Please narrow your search criteria (date range, filters, etc.) to reduce the number of results.`
-      );
-    } else {
-      setDownloadLimitError(null);
+    if (direction === 'next') {
+      // Going forward
+      const newCursor = transfersNextCursor;
+      const newPageIndex = currentPageIndex + 1;
+
+      // Add new cursor to history if we're moving to a new page
+      if (newPageIndex === cursorHistory.length) {
+        setCursorHistory([...cursorHistory, newCursor]);
+      }
+
+      setCurrentPageIndex(newPageIndex);
+      setPagination({ cursor: newCursor, limit });
+      lastRequestParamsRef.current = { filters: model, pagination: { cursor: newCursor, limit } };
+      setRetryCount(0);
+      onFiltersSubmitClick(model, { cursor: newCursor, limit });
+
+    } else if (direction === 'previous') {
+      // Going backward
+      const newPageIndex = Math.max(0, currentPageIndex - 1);
+      const previousCursor = cursorHistory[newPageIndex];
+
+      setCurrentPageIndex(newPageIndex);
+      setPagination({ cursor: previousCursor, limit });
+      lastRequestParamsRef.current = { filters: model, pagination: { cursor: previousCursor, limit } };
+      setRetryCount(0);
+      onFiltersSubmitClick(model, { cursor: previousCursor, limit });
+
+    } else if (direction === 'pageSize') {
+      // Page size changed - reset to first page
+      setCursorHistory([undefined]);
+      setCurrentPageIndex(0);
+      setPagination({ cursor: undefined, limit });
+      lastRequestParamsRef.current = { filters: model, pagination: { cursor: undefined, limit } };
+      setRetryCount(0);
+      onFiltersSubmitClick(model, { cursor: undefined, limit });
     }
-  }, [transfersCount, isTransfersRequested, isTransfersPending]);
-
-  const handlePageChange = (newPagination: { offset: number; limit: number }) => {
-    setPagination(newPagination);
-    lastRequestParamsRef.current = { filters: model, pagination: newPagination };
-    setRetryCount(0); // Reset retry count for new requests
-    onFiltersSubmitClick(model, newPagination);
   };
 
   const handleManualRetry = useCallback(() => {
@@ -350,15 +416,15 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
         return;
       }
       
-      // If total records <= 10K, use single file download
+      // If total records <= RECORDS_PER_FILE, use single file download
       if (totalRecords <= RECORDS_PER_FILE) {
-        setDownloadProgress({ current: 1, total: 1, stage: 'Creating single Excel file...' });
+        setDownloadProgress({ current: 1, total: 1, stage: 'Fetching all records...' });
         try {
-          const singleChunkData = await fetchTransferChunk(
-            model, 
-            0, 
-            totalRecords, 
-            apiBaseUrl, 
+          const result = await fetchTransferChunk(
+            model,
+            undefined, // Start from beginning (no cursor)
+            totalRecords,
+            apiBaseUrl,
             2, // maxRetries
             (retryStage: string) => {
               if (!downloadCancelledRef.current) {
@@ -366,99 +432,113 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
               }
             }
           );
-          
+
           if (downloadCancelledRef.current) {
             return;
           }
-          
-          await downloadTransfersToExcel(singleChunkData);
+
+          setDownloadProgress({ current: 1, total: 1, stage: 'Creating Excel file...' });
+          await downloadTransfersToExcel(result.transfers, dateFormat);
           setDownloadProgress({ current: 1, total: 1, stage: 'Download complete!' });
         } catch (error) {
           console.log('Direct fetch failed, using current page data');
-          await downloadTransfersToExcel(transfers);
+          await downloadTransfersToExcel(transfers, dateFormat);
           setDownloadProgress({ current: 1, total: 1, stage: 'Download complete (current page)!' });
         }
         return;
       }
       
-      // For large datasets, implement all-or-nothing chunked download
+      // For large datasets, implement cursor-based sequential chunked download
       if (totalRecords > RECORDS_PER_FILE) {
-        setDownloadProgress({ 
-          current: 0, 
-          total: totalChunks, 
-          stage: `Large dataset detected (${totalRecords.toLocaleString()} records). Preparing chunked download...` 
+        setDownloadProgress({
+          current: 0,
+          total: totalChunks,
+          stage: `Large dataset detected (${totalRecords.toLocaleString()} records). Preparing chunked download...`
         });
-        
+
         const allFiles: { filename: string; content: ArrayBuffer }[] = [];
-        
-        // Fetch and process each chunk - ALL must succeed
-        for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+        let currentCursor: string | undefined = undefined;
+        let recordsFetched = 0;
+        let chunkIndex = 0;
+
+        // Fetch and process each chunk sequentially using cursor pagination - ALL must succeed
+        while (recordsFetched < totalRecords && recordsFetched < MAX_DOWNLOAD_LIMIT) {
           // Check for cancellation before each chunk
           if (downloadCancelledRef.current) {
             return;
           }
-          
-          const offset = chunkIndex * RECORDS_PER_FILE;
-          const limit = Math.min(RECORDS_PER_FILE, totalRecords - offset);
-          
+
+          const recordsToFetch = Math.min(RECORDS_PER_FILE, totalRecords - recordsFetched, MAX_DOWNLOAD_LIMIT - recordsFetched);
+
           if (!downloadCancelledRef.current) {
-            setDownloadProgress({ 
-              current: chunkIndex, 
-              total: totalChunks, 
-              stage: `Processing file ${chunkIndex + 1} of ${totalChunks} (${limit} records)...` 
+            setDownloadProgress({
+              current: chunkIndex,
+              total: totalChunks,
+              stage: `Fetching file ${chunkIndex + 1} of ${totalChunks} (${recordsToFetch} records)...`
             });
           }
-          
+
           try {
-            // Fetch data for this chunk with progress callback for retry information
-            const chunkData = await fetchTransferChunk(
-              model, 
-              offset, 
-              limit, 
-              apiBaseUrl, 
+            // Fetch data for this chunk using cursor with progress callback for retry information
+            const result:any = await fetchTransferChunk(
+              model,
+              currentCursor, // Use cursor from previous iteration
+              recordsToFetch,
+              apiBaseUrl,
               2, // maxRetries
               (retryStage: string) => {
                 if (!downloadCancelledRef.current) {
-                  setDownloadProgress({ 
-                    current: chunkIndex, 
-                    total: totalChunks, 
-                    stage: retryStage 
+                  setDownloadProgress({
+                    current: chunkIndex,
+                    total: totalChunks,
+                    stage: retryStage
                   });
                 }
               }
             );
-            
+
             // Check for cancellation after fetch
             if (downloadCancelledRef.current) {
               return;
             }
-            
-            if (chunkData.length === 0) {
+
+            if (!result.transfers || result.transfers.length === 0) {
               throw new Error(`Chunk ${chunkIndex + 1} returned no data`);
             }
-            
+
+            // Update cursor for next iteration
+            currentCursor = result.nextCursor;
+            recordsFetched += result.transfers.length;
+
             // Generate Excel file for this chunk
-            const excelFile = generateExcelFileForChunk(chunkData, chunkIndex + 1);
+            const excelFile = generateExcelFileForChunk(result.transfers, chunkIndex + 1, dateFormat);
             allFiles.push(excelFile);
-            
+            chunkIndex++;
+
           } catch (chunkError) {
             console.error(`Failed to process chunk ${chunkIndex + 1}:`, chunkError);
             // ALL-OR-NOTHING: If any chunk fails, entire download fails
             throw new Error(`Download failed at file ${chunkIndex + 1} of ${totalChunks}: ${chunkError.message}`);
           }
-          
+
           // Update progress after successful chunk
           if (!downloadCancelledRef.current) {
-            setDownloadProgress({ 
-              current: chunkIndex + 1, 
-              total: totalChunks, 
-              stage: `Completed file ${chunkIndex + 1} of ${totalChunks}` 
+            setDownloadProgress({
+              current: chunkIndex,
+              total: totalChunks,
+              stage: `Completed file ${chunkIndex} of ${totalChunks} (${recordsFetched} records fetched)`
             });
           }
-          
+
           // Small delay to prevent API spike
-          if (chunkIndex < totalChunks - 1 && !downloadCancelledRef.current) {
+          if (currentCursor && recordsFetched < totalRecords && !downloadCancelledRef.current) {
             await new Promise(resolve => setTimeout(resolve, 500)); // 500ms delay between chunks
+          }
+
+          // Safety check: if no more cursor and we haven't fetched all records, something is wrong
+          if (!currentCursor && recordsFetched < totalRecords) {
+            console.warn(`No more data available after ${recordsFetched} records (expected ${totalRecords})`);
+            break;
           }
         }
         
@@ -503,7 +583,7 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
         }, 3000);
       }
     }
-  }, [model, transfersCount, isDownloadingExcel, RECORDS_PER_FILE, transfers]);
+  }, [model, transfersCount, isDownloadingExcel, RECORDS_PER_FILE, transfers, dateFormat]);
 
   let content = null;
   let onSubmit;
@@ -552,17 +632,38 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
       label: 'Date',
       key: 'initiatedTimestamp',
       sortable: true,
-      func: helpers.toTransfersDate,
+      func: (value: string) => helpers.toTransfersDate(value, dateFormat),
     },
   ];
 
   if (!isTransfersRequested) {
-    content = <TransferFilters model={model} onFilterChange={onFilterChange} />;
+    content = <TransferFilters model={model} onFilterChange={onFilterChange} dateRangeError={dateRangeError} />;
     onSubmit = () => {
-      const initialPagination = { offset: 0, limit: 100 };
+      if (!model.transferId) {
+        if (!model.from && !model.to) {
+          setDateRangeError('Please select a date range or use a preset filter');
+          return;
+        }
+        
+        const fromTime = model.from ? new Date(model.from as number).getTime() : null;
+        const toTime = model.to ? new Date(model.to as number).getTime() : Date.now();
+        
+        if (fromTime && toTime) {
+          const rangeDays = (toTime - fromTime) / (24 * 60 * 60 * 1000);
+          if (rangeDays > MAX_DATE_RANGE_DAYS) {
+            setDateRangeError(`Date range cannot exceed ${MAX_DATE_RANGE_DAYS} days (${Math.ceil(rangeDays)} days selected). Please narrow your search.`);
+            return;
+          }
+        }
+      }
+      
+      setDateRangeError(null);
+      const initialPagination = { cursor: undefined, limit: 50 };
       setPagination(initialPagination);
+      setCursorHistory([undefined]);
+      setCurrentPageIndex(0);
       lastRequestParamsRef.current = { filters: model, pagination: initialPagination };
-      setRetryCount(0); // Reset retry count for new requests
+      setRetryCount(0);
       onFiltersSubmitClick(model, initialPagination);
     };
     submitLabel = 'Find Transfers';
@@ -635,7 +736,7 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
 
       // Error state with retry information
       if (transfersError) {
-        const isRetryableError = transfersError?.includes('503');
+        const isRetryableError = transfersError?.includes('401') || transfersError?.includes('502') || transfersError?.includes('503') || transfersError?.includes('504');
         return (
           <div style={{
             background: retryCount >= maxRetries ? '#f8d7da' : '#fff3cd',
@@ -683,15 +784,51 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
   } else {
     content = (
       <div className="transfers__transfers__list">
-        {downloadLimitError && (
-          <MessageBox kind="danger" style={{ marginBottom: '16px' }}>
-            {downloadLimitError}
-          </MessageBox>
+        {/* Search Results Count */}
+        {isTransfersRequested && !isTransfersCountPending && (
+          <div style={{
+            padding: '12px 16px',
+            backgroundColor: '#f8f9fa',
+            border: '1px solid #dee2e6',
+            borderRadius: '4px',
+            marginBottom: '16px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}>
+            <div style={{ fontSize: '14px', fontWeight: 500, color: '#212529' }}>
+              {transfersCount === 0 ? (
+                <span style={{ color: '#6c757d' }}>No records found</span>
+              ) : (
+                <>
+                  <span style={{ color: '#495057' }}>Search Results: </span>
+                  <span style={{ color: '#007bff', fontSize: '16px' }}>{transfersCount.toLocaleString()}</span>
+                  <span style={{ color: '#6c757d', fontSize: '13px' }}> {transfersCount === 1 ? 'record' : 'records'}</span>
+                </>
+              )}
+            </div>
+          </div>
         )}
+
         {transfers.length > 0 && (
-          <div style={{ marginBottom: '16px' }}>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-              {transfersCount > 100 && (
+          <>
+            {/* Cursor Pagination - Top */}
+            <CursorPagination
+              currentCursor={pagination.cursor}
+              nextCursor={transfersNextCursor}
+              hasMore={transfersHasMore}
+              recordsShown={transfers.length}
+              pageSize={pagination.limit}
+              onPrevious={() => handlePageChange('previous')}
+              onNext={() => handlePageChange('next')}
+              onPageSizeChange={(size) => handlePageChange('pageSize', size)}
+              isLoading={isTransfersPending}
+            />
+
+            <div style={{ marginTop: '16px', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                {transfersCount > 50 && (
                 <Button
                   label={
                     isDownloadingExcel
@@ -706,12 +843,39 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
                 />
               )}
               <Button
-                label={transfersCount <= 100 ? "Download Results" : "Download Current Page"}
-                onClick={() => downloadTransfersToExcel(transfers)}
+                label={transfersCount <= 50 ? "Download Results" : "Download Current Page"}
+                onClick={() => downloadTransfersToExcel(transfers, dateFormat)}
                 disabled={isDownloadingExcel || isTransfersPending}
                 style={{ fontSize: '12px', padding: '6px 12px' }}
                 noFill
               />
+              </div>
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <span style={{ fontSize: '12px', color: '#6c757d' }}>Date Format:</span>
+                  <Button
+                    label={dateFormat === 'iso' ? 'ISO (2025-12-21T08:22:47+07:00)' : 'Readable (21/12/2025 08:22:47)'}
+                    onClick={() => setDateFormat(dateFormat === 'iso' ? 'readable' : 'iso')}
+                    style={{ fontSize: '11px', padding: '4px 8px' }}
+                    noFill
+                  />
+                </div>
+                {transfersCount > 50 && (
+                  <span style={{
+                    fontSize: '11px',
+                    color: transfersCount > MAX_DOWNLOAD_LIMIT ? '#d9534f' : '#5bc0de',
+                    padding: '4px 8px',
+                    backgroundColor: transfersCount > MAX_DOWNLOAD_LIMIT ? '#f2dede' : '#d9edf7',
+                    borderRadius: '3px',
+                    border: `1px solid ${transfersCount > MAX_DOWNLOAD_LIMIT ? '#d9534f' : '#5bc0de'}`
+                  }}>
+                    {transfersCount > MAX_DOWNLOAD_LIMIT
+                      ? `⚠ Max download: ${MAX_DOWNLOAD_LIMIT.toLocaleString()} records`
+                      : `ℹ Max download: ${MAX_DOWNLOAD_LIMIT.toLocaleString()} records`
+                    }
+                  </span>
+                )}
+              </div>
             </div>
             {/* Download progress display */}
             {(isDownloadingExcel || downloadError) && downloadProgress.stage && (
@@ -793,18 +957,36 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
               </div>
             )}
           </div>
+
+          <PaginatedTable
+            columns={transfersColumns}
+            data={transfers}
+            pagination={{ limit: pagination.limit }}
+            totalCount={transfersCount}
+            isLoading={isTransfersPending || isDownloadingExcel}
+            isLoadingCount={isTransfersCountPending}
+            onRowClick={onTransferRowClick}
+            onPageChange={() => {}}
+            showRowNumbers={false}
+            hidePagination={true}
+          />
+
+          {/* Cursor Pagination - Bottom */}
+          <div style={{ marginTop: '16px' }}>
+            <CursorPagination
+              currentCursor={pagination.cursor}
+              nextCursor={transfersNextCursor}
+              hasMore={transfersHasMore}
+              recordsShown={transfers.length}
+              pageSize={pagination.limit}
+              onPrevious={() => handlePageChange('previous')}
+              onNext={() => handlePageChange('next')}
+              onPageSizeChange={(size) => handlePageChange('pageSize', size)}
+              isLoading={isTransfersPending}
+            />
+          </div>
+          </>
         )}
-        <PaginatedTable
-          columns={transfersColumns}
-          data={transfers}
-          pagination={pagination}
-          totalCount={transfersCount}
-          isLoading={isTransfersPending || isDownloadingExcel}
-          isLoadingCount={isTransfersCountPending}
-          onRowClick={onTransferRowClick}
-          onPageChange={handlePageChange}
-          showRowNumbers={true}
-        />
       </div>
     );
     onSubmit = onTransfersSubmitClick;
@@ -870,9 +1052,10 @@ const transferDirectionOfFunds = [
 interface TransferFiltersProps {
   model: TransferFilter;
   onFilterChange: ({ field, value }: { field: string; value: FilterChangeValue }) => void;
+  dateRangeError: string | null;
 }
 
-const TransferFilters: FC<TransferFiltersProps> = ({ model, onFilterChange }) => (
+const TransferFilters: FC<TransferFiltersProps> = ({ model, onFilterChange, dateRangeError }) => (
   <Tabs>
     <TabList>
       <Tab>Basic Find a Transfer</Tab>
@@ -894,6 +1077,40 @@ const TransferFilters: FC<TransferFiltersProps> = ({ model, onFilterChange }) =>
       <TabPanel>
         <DataLabel size="l">Filter transfers:</DataLabel>
         <br />
+        {dateRangeError && (
+          <div style={{
+            marginBottom: '16px',
+            padding: '12px 16px',
+            backgroundColor: '#f8d7da',
+            border: '1px solid #f5c6cb',
+            borderRadius: '4px',
+            color: '#721c24',
+            fontSize: '13px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <span style={{ fontSize: '16px' }}>⚠️</span>
+            <span>{dateRangeError}</span>
+          </div>
+        )}
+        {model.dates === 'CUSTOM' && !dateRangeError && (model.from || model.to) && (
+          <div style={{
+            marginBottom: '16px',
+            padding: '10px 14px',
+            backgroundColor: '#fff3cd',
+            border: '1px solid #ffc107',
+            borderRadius: '4px',
+            color: '#856404',
+            fontSize: '12px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <span style={{ fontSize: '14px' }}>ℹ️</span>
+            <span>Custom date ranges are limited to 1 month maximum.</span>
+          </div>
+        )}
         <br />
         <Row>
           <Column>

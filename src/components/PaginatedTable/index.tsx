@@ -14,15 +14,19 @@ interface PaginatedTableProps {
   columns: Column[];
   data: any[];
   pagination: {
-    offset: number;
+    offset?: number;
+    cursor?: string;
     limit: number;
   };
   totalCount: number;
   isLoading?: boolean;
   isLoadingCount?: boolean;
   onRowClick?: (item: any) => void;
-  onPageChange: (pagination: { offset: number; limit: number }) => void;
+  onPageChange: (pagination: { offset?: number; cursor?: string; limit: number }) => void;
   showRowNumbers?: boolean;
+  nextCursor?: string; // For cursor-based pagination
+  hasMore?: boolean; // For cursor-based pagination
+  hidePagination?: boolean; // Hide built-in pagination controls
 }
 
 const PaginatedTable: FC<PaginatedTableProps> = ({
@@ -35,18 +39,42 @@ const PaginatedTable: FC<PaginatedTableProps> = ({
   onRowClick,
   onPageChange,
   showRowNumbers = false,
+  nextCursor,
+  hasMore,
+  hidePagination = false,
 }) => {
-  const currentPage = Math.floor(pagination.offset / pagination.limit) + 1;
+  // Support both offset-based and cursor-based pagination
+  const currentPage = pagination.offset !== undefined
+    ? Math.floor(pagination.offset / pagination.limit) + 1
+    : 1;
   const [sortConfig, setSortConfig] = useState({ key: '', direction: 'asc' });
 
   const handlePageChange = (page: number, pageSize?: number) => {
     const newPageSize = pageSize || pagination.limit;
-    const newOffset = (page - 1) * newPageSize;
-    onPageChange({ offset: newOffset, limit: newPageSize });
+
+    // If using offset-based pagination
+    if (pagination.offset !== undefined) {
+      const newOffset = (page - 1) * newPageSize;
+      onPageChange({ offset: newOffset, limit: newPageSize });
+    } else {
+      // For cursor-based pagination
+      // Page direction: page > currentPage means "Next", page < currentPage means "Previous"
+      if (page > currentPage) {
+        // Next page - use nextCursor
+        onPageChange({ cursor: nextCursor, limit: newPageSize });
+      } else {
+        // Previous page - go back to first page (we don't track previous cursors yet)
+        onPageChange({ cursor: undefined, limit: newPageSize });
+      }
+    }
   };
 
   const handlePageSizeChange = (current: number, size: number) => {
-    onPageChange({ offset: 0, limit: size });
+    if (pagination.offset !== undefined) {
+      onPageChange({ offset: 0, limit: size });
+    } else {
+      onPageChange({ cursor: undefined, limit: size }); // Reset to first page
+    }
   };
 
   const handleSort = (columnKey: string) => {
@@ -133,7 +161,7 @@ const PaginatedTable: FC<PaginatedTableProps> = ({
               </tr>
             ) : (
               sortedData.map((item, index) => {
-                const rowNumber = pagination.offset + index + 1;
+                const rowNumber = (pagination.offset ?? 0) + index + 1;
                 return (
                   <tr
                     key={item.id || index}
@@ -147,7 +175,7 @@ const PaginatedTable: FC<PaginatedTableProps> = ({
                     )}
                     {columns.map((column) => (
                       <td key={column.key} className="paginated-table-cell">
-                        {column.func 
+                        {column.func
                           ? column.func(item[column.key], item)
                           : item[column.key] || ''
                         }
@@ -161,17 +189,58 @@ const PaginatedTable: FC<PaginatedTableProps> = ({
         </table>
       </div>
 
-      {!isLoadingCount && totalCount > 0 && (
+      {!hidePagination && !isLoadingCount && totalCount > 0 && pagination.offset !== undefined && (
         <Pagination
           current={currentPage}
           total={totalCount}
           pageSize={pagination.limit}
           showSizeChanger
           showTotal={(total, range) => `${range[0]}-${range[1]} of ${total} transfers`}
-          pageSizeOptions={['100', '200','500','1000']}
+          pageSizeOptions={['50', '100', '200', '500', '1000']}
           onChange={handlePageChange}
           onShowSizeChange={handlePageSizeChange}
         />
+      )}
+
+      {/* Cursor-based pagination controls */}
+      {!hidePagination && !isLoadingCount && pagination.offset === undefined && data.length > 0 && (
+        <div className="paginated-table-cursor-controls">
+          <div className="cursor-nav-buttons">
+            <button
+              onClick={() => handlePageChange(currentPage - 1)}
+              disabled={!pagination.cursor}
+              className="pagination-button"
+            >
+              Previous
+            </button>
+            <span className="pagination-info">
+              Showing {data.length} records
+              {hasMore && ' (more available)'}
+            </span>
+            <button
+              onClick={() => handlePageChange(currentPage + 1)}
+              disabled={!hasMore}
+              className="pagination-button"
+            >
+              Next
+            </button>
+          </div>
+          <div className="cursor-page-size">
+            <span className="page-size-label">Records per page:</span>
+            <select
+              value={pagination.limit}
+              onChange={(e) => handlePageSizeChange(1, parseInt(e.target.value))}
+              className="page-size-select"
+            >
+              <option value="20">20</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+              <option value="200">200</option>
+              <option value="500">500</option>
+              <option value="1000">1000</option>
+            </select>
+          </div>
+        </div>
       )}
 
       {isLoadingCount && (

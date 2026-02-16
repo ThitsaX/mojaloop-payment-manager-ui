@@ -80,7 +80,7 @@ function* fetchTransfers(action: RequestTransfersAction) {
     if (action.pagination) {
       params = {
         ...params,
-        offset: action.pagination.offset,
+        cursor: action.pagination.cursor, // Use cursor instead of offset
         limit: action.pagination.limit,
       };
     }
@@ -88,7 +88,14 @@ function* fetchTransfers(action: RequestTransfersAction) {
     // eslint-disable-next-line
     const response = yield call(apis.transfers.read, { params });
     if (is20x(response.status)) {
-      yield put(setTransfers({ data: response.data }));
+      // Handle new cursor-based pagination response format
+      // Response format: { transfers: [...], nextCursor: "...", hasMore: true }
+      const { transfers, nextCursor, hasMore } = response.data;
+      yield put(setTransfers({
+        data: transfers,
+        nextCursor,
+        hasMore
+      }));
     } else {
       yield put(setTransfersError({ error: `HTTP ${response.status}` }));
     }
