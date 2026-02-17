@@ -134,3 +134,19 @@ export const getIsTransferDetailsPending = createSelector(
   (state: State) => state.api,
   isPending('transferDetails.read')
 );
+
+export const getDisputeFilter = (state: State) => state.transfers.disputeFilter;
+export const getIsDisputeRequested = (state: State) => state.transfers.isDisputeRequested;
+export const getDisputeTransactions = (state: State) => state.transfers.disputeTransactions;
+export const getDisputeTransactionsError = (state: State) => state.transfers.disputeTransactionsError;
+export const getDisputeTransactionsNextCursor = (state: State) => state.transfers.disputeTransactionsNextCursor;
+export const getDisputeTransactionsHasMore = (state: State) => state.transfers.disputeTransactionsHasMore;
+export const getDisputeTransactionsCount = (state: State) => state.transfers.disputeTransactionsCount;
+export const getIsDisputeTransactionsPending = createSelector(
+  (state: State) => state.api,
+  isPending('disputeTransactions.read')
+);
+export const getIsDisputeTransactionsCountPending = createSelector(
+  (state: State) => state.api,
+  isPending('disputeTransactionsCount.read')
+);

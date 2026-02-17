@@ -23,6 +23,13 @@ import {
   DateRange,
   SET_TRANSFER_DETAILS,
   TOGGLE_TRANSFER_DETAILS_MODAL,
+  REQUEST_DISPUTE_TRANSACTIONS,
+  UNREQUEST_DISPUTE_TRANSACTIONS,
+  SET_DISPUTE_TRANSACTIONS,
+  SET_DISPUTE_TRANSACTIONS_ERROR,
+  SET_DISPUTE_TRANSACTIONS_COUNT,
+  SET_DISPUTE_TRANSACTIONS_COUNT_ERROR,
+  SET_DISPUTE_FILTER,
 } from './types';
 
 const dateRanges = {
@@ -45,6 +52,16 @@ function getFromDateBySelection(range: DateRange) {
 
 function getToDateBySelection(range: DateRange) {
   return parseInt(dateRanges[range][1], 10);
+}
+
+function getDisputeFilterInitialState() {
+  return {
+    dates: DateRange.Today,
+    from: getFromDateBySelection(DateRange.Today),
+    to: getToDateBySelection(DateRange.Today),
+    direction: undefined,
+    currency: undefined,
+  };
 }
 
 function getTransferFinderFilterInitialState() {
@@ -83,6 +100,15 @@ export const initialState: TransfersState = {
   transfersAvgTimeError: null,
   isTransferDetailsModalVisible: false,
   transferDetailsError: null,
+  disputeFilter: getDisputeFilterInitialState(),
+  isDisputeRequested: false,
+  disputeTransactions: [],
+  disputeTransactionsError: null,
+  disputeTransactionsNextCursor: undefined,
+  disputeTransactionsHasMore: undefined,
+  disputeTransactionsCount: 0,
+  isDisputeTransactionsCountPending: false,
+  disputeTransactionsCountError: null,
 };
 
 export default function transfersReducer(
@@ -117,6 +143,14 @@ export default function transfersReducer(
         isTransferFinderModalVisible: !state.isTransferFinderModalVisible,
         transferFinderFilter: getTransferFinderFilterInitialState(),
         isTransfersRequested: false,
+        disputeFilter: getDisputeFilterInitialState(),
+        isDisputeRequested: false,
+        disputeTransactions: [],
+        disputeTransactionsError: null,
+        disputeTransactionsNextCursor: undefined,
+        disputeTransactionsHasMore: undefined,
+        disputeTransactionsCount: 0,
+        disputeTransactionsCountError: null,
       };
     }
     case TOGGLE_TRANSFER_DETAILS_MODAL: {
@@ -226,6 +260,71 @@ export default function transfersReducer(
         ...state,
         transferDetails: action.data,
         isTransferDetailsModalVisible: true,
+      };
+    case SET_DISPUTE_FILTER: {
+      const { field, value } = action;
+      if (field === 'dates' && value) {
+        return {
+          ...state,
+          disputeFilter: {
+            ...state.disputeFilter,
+            dates: value,
+            from: getFromDateBySelection(value as DateRange),
+            to: getToDateBySelection(value as DateRange),
+          },
+        };
+      }
+      if (field === 'from' || field === 'to') {
+        return {
+          ...state,
+          disputeFilter: {
+            ...state.disputeFilter,
+            [field]: value,
+            dates: 'CUSTOM',
+          },
+        };
+      }
+      return {
+        ...state,
+        disputeFilter: {
+          ...state.disputeFilter,
+          [field]: value,
+        },
+      };
+    }
+    case REQUEST_DISPUTE_TRANSACTIONS:
+      return {
+        ...state,
+        isDisputeRequested: true,
+        disputeTransactionsError: null,
+      };
+    case UNREQUEST_DISPUTE_TRANSACTIONS:
+      return {
+        ...state,
+        isDisputeRequested: false,
+      };
+    case SET_DISPUTE_TRANSACTIONS:
+      return {
+        ...state,
+        disputeTransactions: action.data,
+        disputeTransactionsNextCursor: action.nextCursor,
+        disputeTransactionsHasMore: action.hasMore,
+        disputeTransactionsError: null,
+      };
+    case SET_DISPUTE_TRANSACTIONS_ERROR:
+      return {
+        ...state,
+        disputeTransactionsError: action.error,
+      };
+    case SET_DISPUTE_TRANSACTIONS_COUNT:
+      return {
+        ...state,
+        disputeTransactionsCount: action.count,
+      };
+    case SET_DISPUTE_TRANSACTIONS_COUNT_ERROR:
+      return {
+        ...state,
+        disputeTransactionsCountError: action.error,
       };
     default:
       return state;
