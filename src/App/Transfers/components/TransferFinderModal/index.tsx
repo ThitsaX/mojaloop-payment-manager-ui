@@ -1627,11 +1627,16 @@ const TransferFilters: FC<TransferFiltersProps> = ({ model, onFilterChange, date
         />
       </TabPanel>
       <TabPanel>
-        <DataLabel size="l">Generate Dispute Report:</DataLabel>
-        <br />
+        <div style={{ padding: '8px 0 16px' }}>
+          <DataLabel size="l">Generate Dispute Report</DataLabel>
+          <p style={{ margin: '6px 0 0', fontSize: '13px', color: '#6c757d' }}>
+            Returns transfers that errored but were committed (payment reached recipient). These are dispute-eligible transactions.
+          </p>
+        </div>
+
         {disputeDateRangeError && (
           <div style={{
-            marginBottom: '16px',
+            marginBottom: '20px',
             padding: '12px 16px',
             backgroundColor: '#f8d7da',
             border: '1px solid #f5c6cb',
@@ -1640,75 +1645,85 @@ const TransferFilters: FC<TransferFiltersProps> = ({ model, onFilterChange, date
             fontSize: '13px',
             display: 'flex',
             alignItems: 'center',
-            gap: '8px'
+            gap: '8px',
           }}>
             <span style={{ fontSize: '16px' }}>⚠️</span>
             <span>{disputeDateRangeError}</span>
           </div>
         )}
-        <br />
-        <Row>
-          <Column>
-            <DataLabel size="m">Time range</DataLabel>
-            <Row>
-              <Column>
-                <Select
-                  id="dispute-modal__date"
-                  placeholder="Date"
-                  type="select"
-                  style={{ width: '200px' }}
-                  options={dateRanges}
-                  selected={disputeModel.dates || ''}
-                  onChange={(value: FilterChangeValue) => onDisputeFilterChange({ field: 'dates', value })}
-                />
-              </Column>
-              <Column>
-                <DatePicker
-                  id="dispute-modal__from"
-                  placeholder="From"
-                  style={{ width: '250px' }}
-                  withTime
-                  value={disputeModel.from || ''}
-                  onSelect={(value: FilterChangeValue) => onDisputeFilterChange({ field: 'from', value })}
-                  format="x"
-                />
-              </Column>
-              <Column>
-                <DatePicker
-                  id="dispute-modal__to"
-                  placeholder="To"
-                  style={{ width: '250px' }}
-                  withTime
-                  value={disputeModel.to || ''}
-                  onSelect={(value: FilterChangeValue) => onDisputeFilterChange({ field: 'to', value })}
-                  format="x"
-                />
-              </Column>
-            </Row>
-          </Column>
-          <Column style={{ paddingLeft: '20px' }}>
+
+        {/* Date Range Row */}
+        <div style={{ marginBottom: '24px' }}>
+          <DataLabel size="m">Time Range</DataLabel>
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: '12px', marginTop: '8px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <span style={{ fontSize: '12px', color: '#6c757d', fontWeight: 500 }}>Preset</span>
+              <Select
+                id="dispute-modal__date"
+                placeholder="Date"
+                type="select"
+                style={{ width: '180px' }}
+                options={dateRanges}
+                selected={disputeModel.dates || ''}
+                onChange={(value: FilterChangeValue) => onDisputeFilterChange({ field: 'dates', value })}
+              />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <span style={{ fontSize: '12px', color: '#6c757d', fontWeight: 500 }}>From</span>
+              <DatePicker
+                id="dispute-modal__from"
+                placeholder="From date"
+                style={{ width: '230px' }}
+                withTime
+                value={disputeModel.from || ''}
+                onSelect={(value: FilterChangeValue) => onDisputeFilterChange({ field: 'from', value })}
+                format="x"
+              />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <span style={{ fontSize: '12px', color: '#6c757d', fontWeight: 500 }}>To</span>
+              <DatePicker
+                id="dispute-modal__to"
+                placeholder="To date"
+                style={{ width: '230px' }}
+                withTime
+                value={disputeModel.to || ''}
+                onSelect={(value: FilterChangeValue) => onDisputeFilterChange({ field: 'to', value })}
+                format="x"
+              />
+            </div>
+          </div>
+          {disputeModel.dates === 'CUSTOM' && !disputeDateRangeError && (disputeModel.from || disputeModel.to) && (
+            <div style={{ marginTop: '8px', fontSize: '12px', color: '#856404', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span>ℹ️</span>
+              <span>Custom date ranges are limited to 1 month maximum.</span>
+            </div>
+          )}
+        </div>
+
+        {/* Filters Row */}
+        <div style={{ display: 'flex', gap: '32px', flexWrap: 'wrap' }}>
+          <div style={{ minWidth: '220px' }}>
             <FormInput
               id="dispute-modal__direction"
               label="Direction of Funds"
-              style={{ width: '250px' }}
               type="select"
               options={transferDirectionOfFunds}
               value={disputeModel.direction || TransferDirection.All}
               onChange={(value: FilterChangeValue) => onDisputeFilterChange({ field: 'direction', value })}
             />
-          </Column>
-          <Column style={{ paddingLeft: '20px' }}>
+          </div>
+          <div style={{ minWidth: '180px' }}>
             <FormInput
               id="dispute-modal__currency"
               label="Currency"
-              style={{ width: '200px' }}
               type="select"
               options={disputeCurrencyOptions}
               value={disputeModel.currency || 'ALL'}
               onChange={(value: FilterChangeValue) => onDisputeFilterChange({ field: 'currency', value })}
             />
-          </Column>
-        </Row>
+          </div>
+        </div>
       </TabPanel>
     </TabPanels>
   </Tabs>
