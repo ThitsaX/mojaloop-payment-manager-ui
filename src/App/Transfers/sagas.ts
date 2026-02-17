@@ -11,6 +11,8 @@ import {
   REQUEST_TRANSFERS_SUCCESS_PERC,
   REQUEST_TRANSFERS_AVG_TIME,
   REQUEST_TRANSFER_DETAILS,
+  REQUEST_DISPUTE_TRANSACTIONS,
+  REQUEST_DISPUTE_TRANSACTIONS_COUNT,
   RequestTransfersAction,
   RequestTransfersErrorsAction,
   RequestTransfersCountAction,
@@ -18,6 +20,8 @@ import {
   RequestTransfersSuccessPercAction,
   RequestTransfersAvgTimeAction,
   RequestTransferDetailsAction,
+  RequestDisputeTransactionsAction,
+  RequestDisputeTransactionsCountAction,
   SuccessPercApi,
   AvgTimeApi,
 } from './types';
@@ -36,6 +40,10 @@ import {
   setTransfersAvgTimeError,
   setTransferDetailsError,
   setTransferDetails,
+  setDisputeTransactions,
+  setDisputeTransactionsError,
+  setDisputeTransactionsCount,
+  setDisputeTransactionsCountError,
 } from './actions';
 
 export function* fetchTransfersErrors(action: RequestTransfersErrorsAction) {
@@ -243,6 +251,59 @@ export function* transfersPageSaga() {
   yield takeLatest([REQUEST_TRANSFERS_PAGE_DATA], fetchTransfersAllData);
 }
 
+function* fetchDisputeTransactions(action: RequestDisputeTransactionsAction) {
+  try {
+    const params: any = {
+      startTimestamp: new Date(action.filters.from as number).toISOString(),
+      endTimestamp: new Date(action.filters.to as number).toISOString(),
+      direction: action.filters.direction,
+      currency: action.filters.currency,
+    };
+    if (action.pagination) {
+      params.cursor = action.pagination.cursor;
+      params.limit = action.pagination.limit;
+    }
+    // eslint-disable-next-line
+    const response = yield call(apis.disputeTransactions.read, { params });
+    if (is20x(response.status)) {
+      const { transfers, nextCursor, hasMore } = response.data;
+      yield put(setDisputeTransactions({ data: transfers, nextCursor, hasMore }));
+    } else {
+      yield put(setDisputeTransactionsError({ error: `HTTP ${response.status}` }));
+    }
+  } catch (e) {
+    yield put(setDisputeTransactionsError({ error: e.message }));
+  }
+}
+
+function* fetchDisputeTransactionsCount(action: RequestDisputeTransactionsCountAction) {
+  try {
+    const params = {
+      startTimestamp: new Date(action.filters.from as number).toISOString(),
+      endTimestamp: new Date(action.filters.to as number).toISOString(),
+      direction: action.filters.direction,
+      currency: action.filters.currency,
+    };
+    // eslint-disable-next-line
+    const response = yield call(apis.disputeTransactionsCount.read, { params });
+    if (is20x(response.status)) {
+      yield put(setDisputeTransactionsCount({ count: response.data.count }));
+    } else {
+      yield put(setDisputeTransactionsCountError({ error: response.status }));
+    }
+  } catch (e) {
+    yield put(setDisputeTransactionsCountError({ error: e.message }));
+  }
+}
+
+export function* disputeTransactionsSaga() {
+  yield takeLatest([REQUEST_DISPUTE_TRANSACTIONS], fetchDisputeTransactions);
+}
+
+export function* disputeTransactionsCountSaga() {
+  yield takeLatest([REQUEST_DISPUTE_TRANSACTIONS_COUNT], fetchDisputeTransactionsCount);
+}
+
 export default function* rootSaga() {
   yield all([
     transfersPageSaga(),
@@ -253,5 +314,7 @@ export default function* rootSaga() {
     transfersSuccessPercSaga(),
     transfersAvgTimeSaga(),
     transferDetailsSaga(),
+    disputeTransactionsSaga(),
+    disputeTransactionsCountSaga(),
   ]);
 }

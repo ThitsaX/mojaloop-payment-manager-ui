@@ -28,7 +28,7 @@ import JSZip from 'jszip';
 import axios from 'axios';
 import * as actions from '../../actions';
 import * as selectors from '../../selectors';
-import { Transfer, TransferError, TransferFilter, DateRange } from '../../types';
+import { Transfer, TransferError, TransferFilter, DisputeFilter, DateRange } from '../../types';
 import * as helpers from '../../helpers';
 
 type FilterChangeValue = string | number;
@@ -44,6 +44,15 @@ const stateProps = (state: State) => ({
   transfersNextCursor: selectors.getTransfersNextCursor(state),
   transfersHasMore: selectors.getTransfersHasMore(state),
   apiBaseUrl: state.app.config.apiBaseUrl,
+  disputeModel: selectors.getDisputeFilter(state),
+  isDisputeRequested: selectors.getIsDisputeRequested(state),
+  disputeTransactions: selectors.getDisputeTransactions(state),
+  disputeTransactionsError: selectors.getDisputeTransactionsError(state),
+  isDisputeTransactionsPending: selectors.getIsDisputeTransactionsPending(state),
+  disputeTransactionsCount: selectors.getDisputeTransactionsCount(state),
+  isDisputeTransactionsCountPending: selectors.getIsDisputeTransactionsCountPending(state),
+  disputeTransactionsNextCursor: selectors.getDisputeTransactionsNextCursor(state),
+  disputeTransactionsHasMore: selectors.getDisputeTransactionsHasMore(state),
 });
 
 const dispatchProps = (dispatch: Dispatch) => ({
@@ -56,8 +65,15 @@ const dispatchProps = (dispatch: Dispatch) => ({
   onTransferRowClick: (transferError: TransferError) => {
     dispatch(actions.requestTransferDetails({ transferId: transferError.id }));
   },
-  onRequestTransfersCount: (filters: TransferFilter) => 
+  onRequestTransfersCount: (filters: TransferFilter) =>
     dispatch(actions.requestTransfersCount({ filters })),
+  onDisputeFilterChange: ({ field, value }: { field: string; value: FilterChangeValue }) =>
+    dispatch(actions.setDisputeFilter({ field, value })),
+  onDisputeFiltersSubmitClick: (filters: DisputeFilter, pagination?: { cursor?: string; limit: number }) =>
+    dispatch(actions.requestDisputeTransactions({ filters, pagination })),
+  onDisputeTransactionsSubmitClick: () => dispatch(actions.unrequestDisputeTransactions()),
+  onRequestDisputeTransactionsCount: (filters: DisputeFilter) =>
+    dispatch(actions.requestDisputeTransactionsCount({ filters })),
 });
 
 interface TransferFinderModalProps {
@@ -77,6 +93,19 @@ interface TransferFinderModalProps {
   onFilterChange: ({ field, value }: { field: string; value: FilterChangeValue }) => void;
   onTransferRowClick: (transferError: TransferError) => void;
   onRequestTransfersCount: (filters: TransferFilter) => void;
+  disputeModel: DisputeFilter;
+  isDisputeRequested: boolean;
+  disputeTransactions: Transfer[];
+  disputeTransactionsError: string | null;
+  isDisputeTransactionsPending: boolean;
+  disputeTransactionsCount: number;
+  isDisputeTransactionsCountPending: boolean;
+  disputeTransactionsNextCursor?: string;
+  disputeTransactionsHasMore?: boolean;
+  onDisputeFilterChange: ({ field, value }: { field: string; value: FilterChangeValue }) => void;
+  onDisputeFiltersSubmitClick: (filters: DisputeFilter, pagination?: { cursor?: string; limit: number }) => void;
+  onDisputeTransactionsSubmitClick: () => void;
+  onRequestDisputeTransactionsCount: (filters: DisputeFilter) => void;
 }
 
 function buildTransferApiUrl(filters: TransferFilter, cursor: string | undefined, limit: number, apiBaseUrl: string): string {
@@ -102,6 +131,21 @@ function buildTransferApiUrl(filters: TransferFilter, cursor: string | undefined
   const fullUrl = `${baseUrl}?${params.toString()}`;
   console.log('Chunked download API URL:', fullUrl); // Debug log
   return fullUrl;
+}
+
+function buildDisputeApiUrl(filters: DisputeFilter, cursor: string | undefined, limit: number, apiBaseUrl: string): string {
+  const baseUrl = `${apiBaseUrl}/transfers/dispute`;
+  const params = new URLSearchParams();
+
+  if (filters.from) params.append('startTimestamp', new Date(filters.from as number).toISOString());
+  if (filters.to) params.append('endTimestamp', new Date(filters.to as number).toISOString());
+  if (filters.direction && filters.direction !== TransferDirection.All) params.append('direction', String(filters.direction));
+  if (filters.currency && filters.currency !== 'ALL') params.append('currency', String(filters.currency));
+
+  if (cursor) params.append('cursor', cursor);
+  params.append('limit', limit.toString());
+
+  return `${baseUrl}?${params.toString()}`;
 }
 
 // Helper function to fetch transfers data using cursor-based pagination
@@ -264,6 +308,19 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
   onFilterChange,
   onTransferRowClick,
   onRequestTransfersCount,
+  disputeModel,
+  isDisputeRequested,
+  disputeTransactions,
+  disputeTransactionsError,
+  isDisputeTransactionsPending,
+  disputeTransactionsCount,
+  isDisputeTransactionsCountPending,
+  disputeTransactionsNextCursor,
+  disputeTransactionsHasMore,
+  onDisputeFilterChange,
+  onDisputeFiltersSubmitClick,
+  onDisputeTransactionsSubmitClick,
+  onRequestDisputeTransactionsCount,
 }) => {
   const [pagination, setPagination] = useState<{ cursor?: string; limit: number }>({ cursor: undefined, limit: 20 });
   const [cursorHistory, setCursorHistory] = useState<(string | undefined)[]>([undefined]); // Stack of cursors for backward navigation
@@ -276,6 +333,18 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [dateFormat, setDateFormat] = useState<'iso' | 'readable'>('iso');
   const [dateRangeError, setDateRangeError] = useState<string | null>(null);
+  const [activeMode, setActiveMode] = useState<'transfers' | 'dispute' | null>(null);
+  const [activeFilterTab, setActiveFilterTab] = useState(0); // 0=Basic, 1=Advanced, 2=Dispute
+  // Dispute pagination state
+  const [disputePagination, setDisputePagination] = useState<{ cursor?: string; limit: number }>({ cursor: undefined, limit: 20 });
+  const [disputeCursorHistory, setDisputeCursorHistory] = useState<(string | undefined)[]>([undefined]);
+  const [disputePageIndex, setDisputePageIndex] = useState(0);
+  const [disputeDateRangeError, setDisputeDateRangeError] = useState<string | null>(null);
+  const [isDisputeDownloadingExcel, setIsDisputeDownloadingExcel] = useState(false);
+  const [disputeDownloadProgress, setDisputeDownloadProgress] = useState({ current: 0, total: 0, stage: 'Initializing...' });
+  const [disputeDownloadCancelled, setDisputeDownloadCancelled] = useState(false);
+  const [disputeDownloadError, setDisputeDownloadError] = useState<string | null>(null);
+  const disputeDownloadCancelledRef = useRef<boolean>(false);
   const maxRetries = 2;
   const MAX_DOWNLOAD_LIMIT = 20000;
   const MAX_DATE_RANGE_DAYS = 32; // 1 month maximum (31 days + endOf day time component)
@@ -290,6 +359,12 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
       onRequestTransfersCount(model);
     }
   }, [isTransfersRequested, model, onRequestTransfersCount]);
+
+  useEffect(() => {
+    if (isDisputeRequested) {
+      onRequestDisputeTransactionsCount(disputeModel);
+    }
+  }, [isDisputeRequested, disputeModel, onRequestDisputeTransactionsCount]);
 
   // Auto-retry when there's an error
   useEffect(() => {
@@ -392,6 +467,136 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
     downloadCancelledRef.current = false;
     handleChunkedExcelDownload();
   }, []);
+
+  const handleDisputePageChange = (direction: 'next' | 'previous' | 'pageSize', newLimit?: number) => {
+    const limit = newLimit || disputePagination.limit;
+
+    if (direction === 'next') {
+      const newCursor = disputeTransactionsNextCursor;
+      const newPageIndex = disputePageIndex + 1;
+      if (newPageIndex === disputeCursorHistory.length) {
+        setDisputeCursorHistory([...disputeCursorHistory, newCursor]);
+      }
+      setDisputePageIndex(newPageIndex);
+      setDisputePagination({ cursor: newCursor, limit });
+      onDisputeFiltersSubmitClick(disputeModel, { cursor: newCursor, limit });
+    } else if (direction === 'previous') {
+      const newPageIndex = Math.max(0, disputePageIndex - 1);
+      const previousCursor = disputeCursorHistory[newPageIndex];
+      setDisputePageIndex(newPageIndex);
+      setDisputePagination({ cursor: previousCursor, limit });
+      onDisputeFiltersSubmitClick(disputeModel, { cursor: previousCursor, limit });
+    } else if (direction === 'pageSize') {
+      setDisputeCursorHistory([undefined]);
+      setDisputePageIndex(0);
+      setDisputePagination({ cursor: undefined, limit });
+      onDisputeFiltersSubmitClick(disputeModel, { cursor: undefined, limit });
+    }
+  };
+
+  const handleDisputeChunkedDownload = useCallback(async () => {
+    if (isDisputeDownloadingExcel || disputeTransactionsCount === 0) return;
+    if (disputeTransactionsCount > MAX_DOWNLOAD_LIMIT) return;
+
+    setIsDisputeDownloadingExcel(true);
+    setDisputeDownloadProgress({ current: 0, total: 0, stage: 'Initializing...' });
+    setDisputeDownloadError(null);
+    setDisputeDownloadCancelled(false);
+    disputeDownloadCancelledRef.current = false;
+
+    try {
+      const totalRecords = disputeTransactionsCount;
+      const totalChunks = Math.ceil(totalRecords / RECORDS_PER_FILE);
+
+      if (disputeDownloadCancelledRef.current) return;
+
+      if (totalRecords <= RECORDS_PER_FILE) {
+        setDisputeDownloadProgress({ current: 1, total: 1, stage: 'Fetching all records...' });
+        try {
+          const url = buildDisputeApiUrl(disputeModel, undefined, totalRecords, apiBaseUrl);
+          const axiosResponse = await axios({ method: 'get', url, headers: { 'Content-Type': 'application/json' }, withCredentials: true, validateStatus: () => true });
+          if (!disputeDownloadCancelledRef.current) {
+            setDisputeDownloadProgress({ current: 1, total: 1, stage: 'Creating Excel file...' });
+            const resData = axiosResponse.data;
+            const resultTransfers = resData.transfers || resData;
+            await downloadTransfersToExcel(resultTransfers, dateFormat);
+            setDisputeDownloadProgress({ current: 1, total: 1, stage: 'Download complete!' });
+          }
+        } catch (error) {
+          await downloadTransfersToExcel(disputeTransactions, dateFormat);
+          setDisputeDownloadProgress({ current: 1, total: 1, stage: 'Download complete (current page)!' });
+        }
+        return;
+      }
+
+      // Large dataset: chunked download
+      setDisputeDownloadProgress({ current: 0, total: totalChunks, stage: `Preparing chunked download (${totalRecords.toLocaleString()} records)...` });
+      const allFiles: { filename: string; content: ArrayBuffer }[] = [];
+      let currentCursor: string | undefined = undefined;
+      let recordsFetched = 0;
+      let chunkIndex = 0;
+
+      while (recordsFetched < totalRecords && recordsFetched < MAX_DOWNLOAD_LIMIT) {
+        if (disputeDownloadCancelledRef.current) return;
+
+        const recordsToFetch = Math.min(RECORDS_PER_FILE, totalRecords - recordsFetched, MAX_DOWNLOAD_LIMIT - recordsFetched);
+        if (!disputeDownloadCancelledRef.current) {
+          setDisputeDownloadProgress({ current: chunkIndex, total: totalChunks, stage: `Fetching file ${chunkIndex + 1} of ${totalChunks}...` });
+        }
+
+        try {
+          const url = buildDisputeApiUrl(disputeModel, currentCursor, recordsToFetch, apiBaseUrl);
+          const axiosResponse = await axios({ method: 'get', url, headers: { 'Content-Type': 'application/json' }, withCredentials: true, validateStatus: () => true });
+          if (disputeDownloadCancelledRef.current) return;
+
+          const resData = axiosResponse.data;
+          const chunkTransfers = resData.transfers || resData;
+          if (!chunkTransfers || chunkTransfers.length === 0) throw new Error(`Chunk ${chunkIndex + 1} returned no data`);
+
+          currentCursor = resData.nextCursor;
+          recordsFetched += chunkTransfers.length;
+
+          const excelFile = generateExcelFileForChunk(chunkTransfers, chunkIndex + 1, dateFormat);
+          allFiles.push(excelFile);
+          chunkIndex++;
+        } catch (chunkError) {
+          throw new Error(`Download failed at file ${chunkIndex + 1}: ${chunkError.message}`);
+        }
+
+        if (!disputeDownloadCancelledRef.current) {
+          setDisputeDownloadProgress({ current: chunkIndex, total: totalChunks, stage: `Completed file ${chunkIndex} of ${totalChunks}` });
+        }
+
+        if (currentCursor && recordsFetched < totalRecords && !disputeDownloadCancelledRef.current) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+        if (!currentCursor && recordsFetched < totalRecords) break;
+      }
+
+      if (disputeDownloadCancelledRef.current) return;
+
+      setDisputeDownloadProgress({ current: totalChunks, total: totalChunks, stage: `Creating ZIP file with ${allFiles.length} Excel files...` });
+      await downloadZipFile(allFiles);
+
+      if (!disputeDownloadCancelledRef.current) {
+        setDisputeDownloadProgress({ current: totalChunks, total: totalChunks, stage: `Download complete! All ${totalChunks} files downloaded.` });
+      }
+    } catch (error) {
+      if (!disputeDownloadCancelledRef.current) {
+        setDisputeDownloadError(error.message);
+        setDisputeDownloadProgress({ current: 0, total: 0, stage: `Download failed: ${error.message}` });
+      }
+    } finally {
+      if (!disputeDownloadCancelledRef.current) {
+        setTimeout(() => {
+          if (!disputeDownloadError) {
+            setIsDisputeDownloadingExcel(false);
+            setDisputeDownloadProgress({ current: 0, total: 0, stage: '' });
+          }
+        }, 3000);
+      }
+    }
+  }, [disputeModel, disputeTransactionsCount, isDisputeDownloadingExcel, RECORDS_PER_FILE, disputeTransactions, dateFormat, apiBaseUrl]);
 
   // Main chunked Excel download function
   const handleChunkedExcelDownload = useCallback(async () => {
@@ -636,38 +841,107 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
     },
   ];
 
-  if (!isTransfersRequested) {
-    content = <TransferFilters model={model} onFilterChange={onFilterChange} dateRangeError={dateRangeError} />;
-    onSubmit = () => {
-      if (!model.transferId) {
-        if (!model.from && !model.to) {
-          setDateRangeError('Please select a date range or use a preset filter');
+  if (!isTransfersRequested && !isDisputeRequested) {
+    content = (
+      <TransferFilters
+        model={model}
+        onFilterChange={onFilterChange}
+        dateRangeError={dateRangeError}
+        disputeModel={disputeModel}
+        onDisputeFilterChange={onDisputeFilterChange}
+        disputeDateRangeError={disputeDateRangeError}
+        onTabChange={setActiveFilterTab}
+      />
+    );
+
+    if (activeFilterTab === 2) {
+      // Dispute tab submit
+      onSubmit = () => {
+        if (!disputeModel.from && !disputeModel.to) {
+          setDisputeDateRangeError('Please select a date range or use a preset filter');
           return;
         }
-        
-        const fromTime = model.from ? new Date(model.from as number).getTime() : null;
-        const toTime = model.to ? new Date(model.to as number).getTime() : Date.now();
-        
+        const fromTime = disputeModel.from ? new Date(disputeModel.from as number).getTime() : null;
+        const toTime = disputeModel.to ? new Date(disputeModel.to as number).getTime() : Date.now();
         if (fromTime && toTime) {
           const rangeDays = (toTime - fromTime) / (24 * 60 * 60 * 1000);
           if (rangeDays > MAX_DATE_RANGE_DAYS) {
-            setDateRangeError(`Date range cannot exceed ${MAX_DATE_RANGE_DAYS} days (${Math.ceil(rangeDays)} days selected). Please narrow your search.`);
+            setDisputeDateRangeError(`Date range cannot exceed ${MAX_DATE_RANGE_DAYS} days (${Math.ceil(rangeDays)} days selected). Please narrow your search.`);
             return;
           }
         }
+        setDisputeDateRangeError(null);
+        setActiveMode('dispute');
+        const initialPagination = { cursor: undefined, limit: 50 };
+        setDisputePagination(initialPagination);
+        setDisputeCursorHistory([undefined]);
+        setDisputePageIndex(0);
+        onDisputeFiltersSubmitClick(disputeModel, initialPagination);
+      };
+      submitLabel = 'Generate Report';
+    } else {
+      // Basic or Advanced tab submit
+      onSubmit = () => {
+        if (!model.transferId) {
+          if (!model.from && !model.to) {
+            setDateRangeError('Please select a date range or use a preset filter');
+            return;
+          }
+
+          const fromTime = model.from ? new Date(model.from as number).getTime() : null;
+          const toTime = model.to ? new Date(model.to as number).getTime() : Date.now();
+
+          if (fromTime && toTime) {
+            const rangeDays = (toTime - fromTime) / (24 * 60 * 60 * 1000);
+            if (rangeDays > MAX_DATE_RANGE_DAYS) {
+              setDateRangeError(`Date range cannot exceed ${MAX_DATE_RANGE_DAYS} days (${Math.ceil(rangeDays)} days selected). Please narrow your search.`);
+              return;
+            }
+          }
+        }
+
+        setDateRangeError(null);
+        setActiveMode('transfers');
+        const initialPagination = { cursor: undefined, limit: 50 };
+        setPagination(initialPagination);
+        setCursorHistory([undefined]);
+        setCurrentPageIndex(0);
+        lastRequestParamsRef.current = { filters: model, pagination: initialPagination };
+        setRetryCount(0);
+        onFiltersSubmitClick(model, initialPagination);
+      };
+      submitLabel = 'Find Transfers';
+    }
+  } else if (isDisputeRequested && (disputeTransactionsError || isDisputeTransactionsPending) && activeMode === 'dispute') {
+    // Dispute loading/error state
+    const renderDisputeStatusDisplay = () => {
+      if (isDisputeTransactionsPending && !disputeTransactionsError) {
+        return (
+          <div style={{ background: '#f8f9fa', border: '1px solid #e9ecef', borderRadius: '8px', padding: '20px', margin: '16px 0', textAlign: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+              <Spinner size={16} />
+              <span style={{ fontSize: '14px', color: '#495057' }}>Loading dispute transactions...</span>
+            </div>
+          </div>
+        );
       }
-      
-      setDateRangeError(null);
-      const initialPagination = { cursor: undefined, limit: 50 };
-      setPagination(initialPagination);
-      setCursorHistory([undefined]);
-      setCurrentPageIndex(0);
-      lastRequestParamsRef.current = { filters: model, pagination: initialPagination };
-      setRetryCount(0);
-      onFiltersSubmitClick(model, initialPagination);
+      if (disputeTransactionsError) {
+        return (
+          <div style={{ background: '#f8d7da', border: '1px solid #f5c6cb', borderRadius: '8px', padding: '16px', margin: '16px 0', textAlign: 'center' }}>
+            <div style={{ fontSize: '14px', fontWeight: 500, color: '#721c24', marginBottom: '8px' }}>Unable to load dispute transactions</div>
+            <div style={{ fontSize: '12px', color: '#721c24' }}>{disputeTransactionsError}</div>
+          </div>
+        );
+      }
+      return null;
     };
-    submitLabel = 'Find Transfers';
-  } else if (transfersError || isTransfersPending) {
+    content = renderDisputeStatusDisplay();
+    onSubmit = () => {
+      setActiveMode(null);
+      onDisputeTransactionsSubmitClick();
+    };
+    submitLabel = 'Back to filtering';
+  } else if (isTransfersRequested && (transfersError || isTransfersPending) && activeMode === 'transfers') {
     // Unified Status Display Component
     const renderStatusDisplay = () => {
       // Download progress takes priority
@@ -781,6 +1055,123 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
     };
 
     content = renderStatusDisplay();
+  } else if (isDisputeRequested && activeMode === 'dispute') {
+    // Dispute results
+    content = (
+      <div className="transfers__transfers__list">
+        {isDisputeRequested && !isDisputeTransactionsCountPending && (
+          <div style={{ padding: '12px 16px', backgroundColor: '#f8f9fa', border: '1px solid #dee2e6', borderRadius: '4px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ fontSize: '14px', fontWeight: 500, color: '#212529' }}>
+              {disputeTransactionsCount === 0 ? (
+                <span style={{ color: '#6c757d' }}>No dispute records found</span>
+              ) : (
+                <>
+                  <span style={{ color: '#495057' }}>Dispute Report Results: </span>
+                  <span style={{ color: '#007bff', fontSize: '16px' }}>{disputeTransactionsCount.toLocaleString()}</span>
+                  <span style={{ color: '#6c757d', fontSize: '13px' }}> {disputeTransactionsCount === 1 ? 'record' : 'records'}</span>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        {disputeTransactions.length > 0 && (
+          <>
+            <CursorPagination
+              currentCursor={disputePagination.cursor}
+              nextCursor={disputeTransactionsNextCursor}
+              hasMore={disputeTransactionsHasMore}
+              recordsShown={disputeTransactions.length}
+              pageSize={disputePagination.limit}
+              onPrevious={() => handleDisputePageChange('previous')}
+              onNext={() => handleDisputePageChange('next')}
+              onPageSizeChange={(size) => handleDisputePageChange('pageSize', size)}
+              isLoading={isDisputeTransactionsPending}
+            />
+
+            <div style={{ marginTop: '16px', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  {disputeTransactionsCount > 50 && (
+                    <Button
+                      label={
+                        isDisputeDownloadingExcel
+                          ? 'Preparing Download...'
+                          : disputeTransactionsCount > MAX_DOWNLOAD_LIMIT
+                            ? `Too Many Results (${disputeTransactionsCount.toLocaleString()} records) - Refine Search`
+                            : `Download (${disputeTransactionsCount.toLocaleString()} records)`
+                      }
+                      noFill
+                      onClick={handleDisputeChunkedDownload}
+                      disabled={isDisputeDownloadingExcel || isDisputeTransactionsPending || disputeTransactionsCount > MAX_DOWNLOAD_LIMIT}
+                    />
+                  )}
+                  <Button
+                    label={disputeTransactionsCount <= 50 ? 'Download Results' : 'Download Current Page'}
+                    onClick={() => downloadTransfersToExcel(disputeTransactions, dateFormat)}
+                    disabled={isDisputeDownloadingExcel || isDisputeTransactionsPending}
+                    style={{ fontSize: '12px', padding: '6px 12px' }}
+                    noFill
+                  />
+                </div>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <span style={{ fontSize: '12px', color: '#6c757d' }}>Date Format:</span>
+                  <Button
+                    label={dateFormat === 'iso' ? 'ISO (2025-12-21T08:22:47+07:00)' : 'Readable (21/12/2025 08:22:47)'}
+                    onClick={() => setDateFormat(dateFormat === 'iso' ? 'readable' : 'iso')}
+                    style={{ fontSize: '11px', padding: '4px 8px' }}
+                    noFill
+                  />
+                </div>
+              </div>
+              {(isDisputeDownloadingExcel || disputeDownloadError) && disputeDownloadProgress.stage && (
+                <div style={{ background: disputeDownloadError ? '#f8d7da' : '#f8f9fa', border: `1px solid ${disputeDownloadError ? '#f5c6cb' : '#e9ecef'}`, borderRadius: '8px', padding: '16px', marginTop: '12px', textAlign: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '12px' }}>
+                    {disputeDownloadError ? <span style={{ fontSize: '18px' }}>❌</span> : <Spinner size={16} />}
+                    <span style={{ fontSize: '14px', fontWeight: 500, color: disputeDownloadError ? '#721c24' : '#495057' }}>{disputeDownloadProgress.stage}</span>
+                  </div>
+                  {disputeDownloadError && (
+                    <Button label="Retry Download" onClick={() => { setDisputeDownloadError(null); handleDisputeChunkedDownload(); }} style={{ fontSize: '12px', padding: '6px 12px', marginTop: '8px' }} />
+                  )}
+                </div>
+              )}
+            </div>
+
+            <PaginatedTable
+              columns={transfersColumns}
+              data={disputeTransactions}
+              pagination={{ limit: disputePagination.limit }}
+              totalCount={disputeTransactionsCount}
+              isLoading={isDisputeTransactionsPending || isDisputeDownloadingExcel}
+              isLoadingCount={isDisputeTransactionsCountPending}
+              onRowClick={onTransferRowClick}
+              onPageChange={() => {}}
+              showRowNumbers={false}
+              hidePagination={true}
+            />
+
+            <div style={{ marginTop: '16px' }}>
+              <CursorPagination
+                currentCursor={disputePagination.cursor}
+                nextCursor={disputeTransactionsNextCursor}
+                hasMore={disputeTransactionsHasMore}
+                recordsShown={disputeTransactions.length}
+                pageSize={disputePagination.limit}
+                onPrevious={() => handleDisputePageChange('previous')}
+                onNext={() => handleDisputePageChange('next')}
+                onPageSizeChange={(size) => handleDisputePageChange('pageSize', size)}
+                isLoading={isDisputeTransactionsPending}
+              />
+            </div>
+          </>
+        )}
+      </div>
+    );
+    onSubmit = () => {
+      setActiveMode(null);
+      onDisputeTransactionsSubmitClick();
+    };
+    submitLabel = 'Back to filtering';
   } else {
     content = (
       <div className="transfers__transfers__list">
@@ -989,10 +1380,13 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
         )}
       </div>
     );
-    onSubmit = onTransfersSubmitClick;
+    onSubmit = () => {
+      setActiveMode(null);
+      onTransfersSubmitClick();
+    };
     submitLabel = 'Back to filtering';
   }
-  
+
   return (
     <Modal
       title="Find a Transfer"
@@ -1053,13 +1447,24 @@ interface TransferFiltersProps {
   model: TransferFilter;
   onFilterChange: ({ field, value }: { field: string; value: FilterChangeValue }) => void;
   dateRangeError: string | null;
+  disputeModel: DisputeFilter;
+  onDisputeFilterChange: ({ field, value }: { field: string; value: FilterChangeValue }) => void;
+  disputeDateRangeError: string | null;
+  onTabChange?: (index: number) => void;
 }
 
-const TransferFilters: FC<TransferFiltersProps> = ({ model, onFilterChange, dateRangeError }) => (
+const disputeCurrencyOptions = [
+  { label: 'All', value: 'ALL' },
+  { label: 'USD', value: 'USD' },
+  { label: 'LRD', value: 'LRD' },
+];
+
+const TransferFilters: FC<TransferFiltersProps> = ({ model, onFilterChange, dateRangeError, disputeModel, onDisputeFilterChange, disputeDateRangeError, onTabChange }) => (
   <Tabs>
     <TabList>
-      <Tab>Basic Find a Transfer</Tab>
-      <Tab>Advanced Filtering</Tab>
+      <Tab onClick={() => onTabChange && onTabChange(0)}>Basic Find a Transfer</Tab>
+      <Tab onClick={() => onTabChange && onTabChange(1)}>Advanced Filtering</Tab>
+      <Tab onClick={() => onTabChange && onTabChange(2)}>Dispute Transactions</Tab>
     </TabList>
     <TabPanels>
       <TabPanel>
@@ -1220,6 +1625,90 @@ const TransferFilters: FC<TransferFiltersProps> = ({ model, onFilterChange, date
           value={model.status || ''}
           onChange={(value: FilterChangeValue) => onFilterChange({ field: 'status', value })}
         />
+      </TabPanel>
+      <TabPanel>
+        <DataLabel size="l">Generate Dispute Report:</DataLabel>
+        <br />
+        {disputeDateRangeError && (
+          <div style={{
+            marginBottom: '16px',
+            padding: '12px 16px',
+            backgroundColor: '#f8d7da',
+            border: '1px solid #f5c6cb',
+            borderRadius: '4px',
+            color: '#721c24',
+            fontSize: '13px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <span style={{ fontSize: '16px' }}>⚠️</span>
+            <span>{disputeDateRangeError}</span>
+          </div>
+        )}
+        <br />
+        <Row>
+          <Column>
+            <DataLabel size="m">Time range</DataLabel>
+            <Row>
+              <Column>
+                <Select
+                  id="dispute-modal__date"
+                  placeholder="Date"
+                  type="select"
+                  style={{ width: '200px' }}
+                  options={dateRanges}
+                  selected={disputeModel.dates || ''}
+                  onChange={(value: FilterChangeValue) => onDisputeFilterChange({ field: 'dates', value })}
+                />
+              </Column>
+              <Column>
+                <DatePicker
+                  id="dispute-modal__from"
+                  placeholder="From"
+                  style={{ width: '250px' }}
+                  withTime
+                  value={disputeModel.from || ''}
+                  onSelect={(value: FilterChangeValue) => onDisputeFilterChange({ field: 'from', value })}
+                  format="x"
+                />
+              </Column>
+              <Column>
+                <DatePicker
+                  id="dispute-modal__to"
+                  placeholder="To"
+                  style={{ width: '250px' }}
+                  withTime
+                  value={disputeModel.to || ''}
+                  onSelect={(value: FilterChangeValue) => onDisputeFilterChange({ field: 'to', value })}
+                  format="x"
+                />
+              </Column>
+            </Row>
+          </Column>
+          <Column style={{ paddingLeft: '20px' }}>
+            <FormInput
+              id="dispute-modal__direction"
+              label="Direction of Funds"
+              style={{ width: '250px' }}
+              type="select"
+              options={transferDirectionOfFunds}
+              value={disputeModel.direction || TransferDirection.All}
+              onChange={(value: FilterChangeValue) => onDisputeFilterChange({ field: 'direction', value })}
+            />
+          </Column>
+          <Column style={{ paddingLeft: '20px' }}>
+            <FormInput
+              id="dispute-modal__currency"
+              label="Currency"
+              style={{ width: '200px' }}
+              type="select"
+              options={disputeCurrencyOptions}
+              value={disputeModel.currency || 'ALL'}
+              onChange={(value: FilterChangeValue) => onDisputeFilterChange({ field: 'currency', value })}
+            />
+          </Column>
+        </Row>
       </TabPanel>
     </TabPanels>
   </Tabs>

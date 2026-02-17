@@ -1,4 +1,21 @@
 import {
+  REQUEST_DISPUTE_TRANSACTIONS,
+  SET_DISPUTE_TRANSACTIONS,
+  SET_DISPUTE_TRANSACTIONS_ERROR,
+  UNREQUEST_DISPUTE_TRANSACTIONS,
+  REQUEST_DISPUTE_TRANSACTIONS_COUNT,
+  SET_DISPUTE_TRANSACTIONS_COUNT,
+  SET_DISPUTE_TRANSACTIONS_COUNT_ERROR,
+  SET_DISPUTE_FILTER,
+  RequestDisputeTransactionsAction,
+  UnrequestDisputeTransactionsAction,
+  SetDisputeTransactionsAction,
+  SetDisputeTransactionsErrorAction,
+  RequestDisputeTransactionsCountAction,
+  SetDisputeTransactionsCountAction,
+  SetDisputeTransactionsCountErrorAction,
+  SetDisputeFilterAction,
+  DisputeFilter,
   REQUEST_TRANSFERS_PAGE_DATA,
   RequestTransfersPageDataAction,
   REQUEST_TRANSFERS_ERRORS,
@@ -310,5 +327,84 @@ export function setTransfersCountError({ error }: { error: string }): SetTransfe
   return {
     type: SET_TRANSFERS_COUNT_ERROR,
     error,
+  };
+}
+
+export function requestDisputeTransactions({
+  filters,
+  pagination,
+}: {
+  filters: DisputeFilter;
+  pagination?: { cursor?: string; limit: number };
+}): RequestDisputeTransactionsAction {
+  return {
+    type: REQUEST_DISPUTE_TRANSACTIONS,
+    filters,
+    pagination,
+  };
+}
+
+export function unrequestDisputeTransactions(): UnrequestDisputeTransactionsAction {
+  return {
+    type: UNREQUEST_DISPUTE_TRANSACTIONS,
+  };
+}
+
+export function setDisputeTransactions({
+  data,
+  nextCursor,
+  hasMore,
+}: {
+  data: Transfer[];
+  nextCursor?: string;
+  hasMore?: boolean;
+}): SetDisputeTransactionsAction {
+  return {
+    type: SET_DISPUTE_TRANSACTIONS,
+    data,
+    nextCursor,
+    hasMore,
+  };
+}
+
+export function setDisputeTransactionsError({ error }: { error: string }): SetDisputeTransactionsErrorAction {
+  return {
+    type: SET_DISPUTE_TRANSACTIONS_ERROR,
+    error,
+  };
+}
+
+export function requestDisputeTransactionsCount({ filters }: { filters: DisputeFilter }): RequestDisputeTransactionsCountAction {
+  return {
+    type: REQUEST_DISPUTE_TRANSACTIONS_COUNT,
+    filters,
+  };
+}
+
+export function setDisputeTransactionsCount({ count }: { count: number }): SetDisputeTransactionsCountAction {
+  return {
+    type: SET_DISPUTE_TRANSACTIONS_COUNT,
+    count,
+  };
+}
+
+export function setDisputeTransactionsCountError({ error }: { error: string }): SetDisputeTransactionsCountErrorAction {
+  return {
+    type: SET_DISPUTE_TRANSACTIONS_COUNT_ERROR,
+    error,
+  };
+}
+
+export function setDisputeFilter({
+  field,
+  value,
+}: {
+  field: string;
+  value: string | number;
+}): SetDisputeFilterAction {
+  return {
+    type: SET_DISPUTE_FILTER,
+    field,
+    value,
   };
 }

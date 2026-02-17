@@ -111,6 +111,16 @@ const transfersCount: Config<Todo, State> = {
   url: () => '/transfers/count',
 };
 
+const disputeTransactions: Config<Todo, State> = {
+  service: services.localNode,
+  url: () => '/transfers/dispute',
+};
+
+const disputeTransactionsCount: Config<Todo, State> = {
+  service: services.localNode,
+  url: () => '/transfers/dispute/count',
+};
+
 const transferDetails: Config<Todo, State> = {
   service: services.localNode,
   url: (_: State, { transferId }: { transferId: string }) => `/transfers/${transferId}/details`,
@@ -274,6 +284,8 @@ const endpoints = {
   transfersErrors,
   transfers,
   transfersCount,
+  disputeTransactions,
+  disputeTransactionsCount,
   transfersStatuses,
   transfersSuccessPerc,
   transfersAvgTime,

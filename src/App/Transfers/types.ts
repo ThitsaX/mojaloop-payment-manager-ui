@@ -38,6 +38,15 @@ export const SET_TRANSFER_DETAILS = 'Transfers / Set Transfer Details';
 export const TOGGLE_TRANSFER_DETAILS_MODAL = 'Transfers / Select Transfers Detail View';
 export const SET_TRANSFER_DETAILS_ERROR = 'Transfers / Set Transfer Details Error';
 
+export const REQUEST_DISPUTE_TRANSACTIONS = 'Transfers / Request Dispute Transactions';
+export const SET_DISPUTE_TRANSACTIONS = 'Transfers / Set Dispute Transactions';
+export const SET_DISPUTE_TRANSACTIONS_ERROR = 'Transfers / Set Dispute Transactions Error';
+export const UNREQUEST_DISPUTE_TRANSACTIONS = 'Transfers / Unrequest Dispute Transactions';
+export const REQUEST_DISPUTE_TRANSACTIONS_COUNT = 'Transfers / Request Dispute Transactions Count';
+export const SET_DISPUTE_TRANSACTIONS_COUNT = 'Transfers / Set Dispute Transactions Count';
+export const SET_DISPUTE_TRANSACTIONS_COUNT_ERROR = 'Transfers / Set Dispute Transactions Count Error';
+export const SET_DISPUTE_FILTER = 'Transfers / Set Dispute Filter';
+
 export interface TransferError {
   id: string;
   institution: string;
@@ -84,6 +93,14 @@ export interface TransferFilter {
   direction: string | number | undefined;
   institution: string | number | undefined;
   status: string | number | undefined;
+}
+
+export interface DisputeFilter {
+  dates: string | number | undefined;
+  from: string | number | undefined;
+  to: string | number | undefined;
+  direction: string | number | undefined;
+  currency: string | undefined;
 }
 
 export interface Transfer {
@@ -359,6 +376,15 @@ export interface TransfersState {
   transferDetails?: TransferDetails;
   isTransferDetailsModalVisible: boolean;
   transferDetailsError: ErrorMessage;
+  disputeFilter: DisputeFilter;
+  isDisputeRequested: boolean;
+  disputeTransactions: Transfer[];
+  disputeTransactionsError: ErrorMessage;
+  disputeTransactionsNextCursor?: string;
+  disputeTransactionsHasMore?: boolean;
+  disputeTransactionsCount: number;
+  isDisputeTransactionsCountPending: boolean;
+  disputeTransactionsCountError: ErrorMessage;
 }
 
 export interface FxpConversionsState {
@@ -519,6 +545,52 @@ export interface SetTransferDetailsErrorAction {
   error: string;
 }
 
+export interface RequestDisputeTransactionsAction {
+  type: typeof REQUEST_DISPUTE_TRANSACTIONS;
+  filters: DisputeFilter;
+  pagination?: {
+    cursor?: string;
+    limit: number;
+  };
+}
+
+export interface UnrequestDisputeTransactionsAction {
+  type: typeof UNREQUEST_DISPUTE_TRANSACTIONS;
+}
+
+export interface SetDisputeTransactionsAction {
+  type: typeof SET_DISPUTE_TRANSACTIONS;
+  data: Transfer[];
+  nextCursor?: string;
+  hasMore?: boolean;
+}
+
+export interface SetDisputeTransactionsErrorAction {
+  type: typeof SET_DISPUTE_TRANSACTIONS_ERROR;
+  error: string;
+}
+
+export interface RequestDisputeTransactionsCountAction {
+  type: typeof REQUEST_DISPUTE_TRANSACTIONS_COUNT;
+  filters: DisputeFilter;
+}
+
+export interface SetDisputeTransactionsCountAction {
+  type: typeof SET_DISPUTE_TRANSACTIONS_COUNT;
+  count: number;
+}
+
+export interface SetDisputeTransactionsCountErrorAction {
+  type: typeof SET_DISPUTE_TRANSACTIONS_COUNT_ERROR;
+  error: string;
+}
+
+export interface SetDisputeFilterAction {
+  type: typeof SET_DISPUTE_FILTER;
+  field: string;
+  value: string | number;
+}
+
 export type TransfersActionTypes =
   | RequestTransfersPageDataAction
   | RequestTransfersErrorsAction
@@ -546,4 +618,12 @@ export type TransfersActionTypes =
   | SetTransfersAvgTimeErrorAction
   | RequestTransferDetailsAction
   | SetTransferDetailsAction
-  | ToggleTransferDetailsModalAction;
+  | ToggleTransferDetailsModalAction
+  | RequestDisputeTransactionsAction
+  | UnrequestDisputeTransactionsAction
+  | SetDisputeTransactionsAction
+  | SetDisputeTransactionsErrorAction
+  | RequestDisputeTransactionsCountAction
+  | SetDisputeTransactionsCountAction
+  | SetDisputeTransactionsCountErrorAction
+  | SetDisputeFilterAction;
