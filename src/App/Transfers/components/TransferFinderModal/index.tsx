@@ -1459,12 +1459,17 @@ const disputeCurrencyOptions = [
   { label: 'LRD', value: 'LRD' },
 ];
 
-const TransferFilters: FC<TransferFiltersProps> = ({ model, onFilterChange, dateRangeError, disputeModel, onDisputeFilterChange, disputeDateRangeError, onTabChange }) => (
+const TransferFilters: FC<TransferFiltersProps> = ({ model, onFilterChange, dateRangeError, disputeModel, onDisputeFilterChange, disputeDateRangeError, onTabChange }) => {
+  const handleTabClick = (index: number) => {
+    if (onTabChange) onTabChange(index);
+  };
+
+  return (
   <Tabs>
     <TabList>
-      <Tab onClick={() => onTabChange && onTabChange(0)}>Basic Find a Transfer</Tab>
-      <Tab onClick={() => onTabChange && onTabChange(1)}>Advanced Filtering</Tab>
-      <Tab onClick={() => onTabChange && onTabChange(2)}>Dispute Transactions</Tab>
+      <Tab onClick={() => handleTabClick(0)}>Basic Find a Transfer</Tab>
+      <Tab onClick={() => handleTabClick(1)}>Advanced Filtering</Tab>
+      <Tab onClick={() => handleTabClick(2)}>Dispute Transactions</Tab>
     </TabList>
     <TabPanels>
       <TabPanel>
@@ -1724,6 +1729,7 @@ const TransferFilters: FC<TransferFiltersProps> = ({ model, onFilterChange, date
       </TabPanel>
     </TabPanels>
   </Tabs>
-);
+  );
+};
 
 export default connect(stateProps, dispatchProps)(TransferFinderModal);
