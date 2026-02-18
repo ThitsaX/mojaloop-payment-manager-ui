@@ -1628,10 +1628,7 @@ const TransferFilters: FC<TransferFiltersProps> = ({ model, onFilterChange, date
       </TabPanel>
       <TabPanel>
         <div style={{ padding: '8px 0 16px' }}>
-          <DataLabel size="l">Generate Dispute Report</DataLabel>
-          <p style={{ margin: '6px 0 0', fontSize: '13px', color: '#6c757d' }}>
-            Returns transfers that errored but were committed (payment reached recipient). These are dispute-eligible transactions.
-          </p>
+          <DataLabel size="l">Find Disputed Transfers</DataLabel>
         </div>
 
         {disputeDateRangeError && (
