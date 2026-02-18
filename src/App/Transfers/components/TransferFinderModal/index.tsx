@@ -1465,11 +1465,11 @@ const TransferFilters: FC<TransferFiltersProps> = ({ model, onFilterChange, date
   };
 
   return (
-  <Tabs>
+  <Tabs onSelect={(_e: any, index: number) => handleTabClick(index)}>
     <TabList>
-      <Tab onClick={() => handleTabClick(0)}>Basic Find a Transfer</Tab>
-      <Tab onClick={() => handleTabClick(1)}>Advanced Filtering</Tab>
-      <Tab onClick={() => handleTabClick(2)}>Dispute Transactions</Tab>
+      <Tab>Basic Find a Transfer</Tab>
+      <Tab>Advanced Filtering</Tab>
+      <Tab>Dispute Transactions</Tab>
     </TabList>
     <TabPanels>
       <TabPanel>
