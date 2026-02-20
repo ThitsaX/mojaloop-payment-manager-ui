@@ -291,6 +291,109 @@ async function downloadTransfersToExcel(
   xlsx.writeFile(wb, fileName);
 }
 
+// Generates a formatted Dispute Transaction Report Excel workbook.
+// partNumber is 1-based (for chunked ZIP downloads); startRowNumber is 0-based offset for the "No." column.
+function generateDisputeReportExcel(
+  transfers: any[],
+  filters: DisputeFilter,
+  partNumber?: number,
+  startRowNumber: number = 0
+): { filename: string; content: ArrayBuffer } {
+  const wb = xlsx.utils.book_new();
+  const ws: xlsx.WorkSheet = {};
+
+  const fromDate = filters.from ? new Date(filters.from as number).toISOString() : '';
+  const toDate = filters.to ? new Date(filters.to as number).toISOString() : '';
+
+  const titleStyle   = { font: { name: 'Calibri', sz: 11, bold: true }, alignment: { horizontal: 'left' } };
+  const labelStyle   = { font: { name: 'Calibri', sz: 11 },             alignment: { horizontal: 'left' } };
+  const headerStyle  = { font: { name: 'Calibri', sz: 11, bold: true }, alignment: { horizontal: 'left' } };
+  const textStyle    = { font: { name: 'Calibri', sz: 11 },             alignment: { horizontal: 'left' } };
+  const numStyle     = { font: { name: 'Calibri', sz: 11 },             alignment: { horizontal: 'right' } };
+  const amountStyle  = { font: { name: 'Calibri', sz: 11 },             alignment: { horizontal: 'right' } };
+
+  // Row 1 – Report title
+  ws['A1'] = { v: 'Dispute Transaction Report', t: 's', s: titleStyle };
+
+  // Row 2 – Report period
+  ws['A2'] = { v: `Report Period: ${fromDate} to ${toDate}`, t: 's', s: labelStyle };
+
+  // Row 3 – empty (spacer)
+
+  // Row 4 – Column headers
+  const COLS    = ['A','B','C','D','E','F','G','H','I','J','K','L'];
+  const HEADERS = [
+    'No.', 'Transaction ID', 'Direction', 'Currency', 'Amount',
+    'Sender', 'Sender ID Type', 'Sender ID Value',
+    'Receiver', 'Receiver ID Type', 'Receiver ID Value', 'Error Type',
+  ];
+  COLS.forEach((col, i) => {
+    ws[`${col}4`] = { v: HEADERS[i], t: 's', s: headerStyle };
+  });
+
+  // Rows 5+ – Data
+  transfers.forEach((t, idx) => {
+    const row = idx + 5;
+    ws[`A${row}`] = { v: startRowNumber + idx + 1,                                              t: 'n', z: '#,##0',    s: numStyle    };
+    ws[`B${row}`] = { v: t.id            || '',                                                  t: 's',               s: textStyle   };
+    ws[`C${row}`] = { v: t.direction     || '',                                                  t: 's',               s: textStyle   };
+    ws[`D${row}`] = { v: t.currency      || '',                                                  t: 's',               s: textStyle   };
+    ws[`E${row}`] = { v: typeof t.amount === 'number' ? t.amount : (parseFloat(t.amount) || 0), t: 'n', z: '#,##0.00', s: amountStyle };
+    ws[`F${row}`] = { v: t.sender        || '',                                                  t: 's',               s: textStyle   };
+    ws[`G${row}`] = { v: t.senderIdType  || '',                                                  t: 's',               s: textStyle   };
+    ws[`H${row}`] = { v: t.senderIdValue || '',                                                  t: 's',               s: textStyle   };
+    ws[`I${row}`] = { v: t.recipient     || '',                                                  t: 's',               s: textStyle   };
+    ws[`J${row}`] = { v: t.recipientIdType  || '',                                               t: 's',               s: textStyle   };
+    ws[`K${row}`] = { v: t.recipientIdValue || '',                                               t: 's',               s: textStyle   };
+    ws[`L${row}`] = { v: t.errorType     || '',                                                  t: 's',               s: textStyle   };
+  });
+
+  const lastRow = Math.max(4, transfers.length + 4);
+  ws['!ref'] = `A1:L${lastRow}`;
+  ws['!cols'] = [
+    { wch: 8  }, // No.
+    { wch: 38 }, // Transaction ID
+    { wch: 12 }, // Direction
+    { wch: 10 }, // Currency
+    { wch: 18 }, // Amount
+    { wch: 25 }, // Sender
+    { wch: 18 }, // Sender ID Type
+    { wch: 25 }, // Sender ID Value
+    { wch: 25 }, // Receiver
+    { wch: 18 }, // Receiver ID Type
+    { wch: 25 }, // Receiver ID Value
+    { wch: 40 }, // Error Type
+  ];
+
+  xlsx.utils.book_append_sheet(wb, ws, 'Dispute Report');
+
+  const dateStr  = new Date().toISOString().split('T')[0];
+  const filename = partNumber
+    ? `Dispute_Report_Part${String(partNumber).padStart(2, '0')}.xlsx`
+    : `Dispute_Report_${dateStr}.xlsx`;
+
+  const content = xlsx.write(wb, { bookType: 'xlsx', type: 'array', cellStyles: true });
+  return { filename, content };
+}
+
+async function downloadDisputeReportSingleFile(
+  transfers: any[],
+  filters: DisputeFilter
+): Promise<void> {
+  const { filename, content } = generateDisputeReportExcel(transfers, filters);
+  const blob = new Blob([content], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.URL.revokeObjectURL(url);
+}
+
 const TransferFinderModal: FC<TransferFinderModalProps> = ({
   model,
   transfers,
@@ -519,11 +622,11 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
             setDisputeDownloadProgress({ current: 1, total: 1, stage: 'Creating Excel file...' });
             const resData = axiosResponse.data;
             const resultTransfers = resData.transfers || resData;
-            await downloadTransfersToExcel(resultTransfers, dateFormat);
+            await downloadDisputeReportSingleFile(resultTransfers, disputeModel);
             setDisputeDownloadProgress({ current: 1, total: 1, stage: 'Download complete!' });
           }
         } catch (error) {
-          await downloadTransfersToExcel(disputeTransactions, dateFormat);
+          await downloadDisputeReportSingleFile(disputeTransactions, disputeModel);
           setDisputeDownloadProgress({ current: 1, total: 1, stage: 'Download complete (current page)!' });
         }
         return;
@@ -556,7 +659,12 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
           currentCursor = resData.nextCursor;
           recordsFetched += chunkTransfers.length;
 
-          const excelFile = generateExcelFileForChunk(chunkTransfers, chunkIndex + 1, dateFormat);
+          const excelFile = generateDisputeReportExcel(
+            chunkTransfers,
+            disputeModel,
+            chunkIndex + 1,
+            recordsFetched - chunkTransfers.length
+          );
           allFiles.push(excelFile);
           chunkIndex++;
         } catch (chunkError) {
@@ -596,7 +704,7 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
         }, 3000);
       }
     }
-  }, [disputeModel, disputeTransactionsCount, isDisputeDownloadingExcel, RECORDS_PER_FILE, disputeTransactions, dateFormat, apiBaseUrl]);
+  }, [disputeModel, disputeTransactionsCount, isDisputeDownloadingExcel, RECORDS_PER_FILE, disputeTransactions, apiBaseUrl]);
 
   // Main chunked Excel download function
   const handleChunkedExcelDownload = useCallback(async () => {
@@ -1108,7 +1216,7 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
                   )}
                   <Button
                     label={disputeTransactionsCount <= 50 ? 'Download Results' : 'Download Current Page'}
-                    onClick={() => downloadTransfersToExcel(disputeTransactions, dateFormat)}
+                    onClick={() => downloadDisputeReportSingleFile(disputeTransactions, disputeModel)}
                     disabled={isDisputeDownloadingExcel || isDisputeTransactionsPending}
                     style={{ fontSize: '12px', padding: '6px 12px' }}
                     noFill
