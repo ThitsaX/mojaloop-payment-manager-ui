@@ -325,7 +325,7 @@ function generateDisputeReportExcel(
   const HEADERS = [
     'No.', 'Transaction ID', 'Direction', 'Currency', 'Amount',
     'Sender', 'Sender ID Type', 'Sender ID Value',
-    'Receiver', 'Receiver ID Type', 'Receiver ID Value', 'Error Type',
+    'Receiver', 'Receiver ID Type', 'Receiver ID Value', 'Error',
   ];
   COLS.forEach((col, i) => {
     ws[`${col}4`] = { v: HEADERS[i], t: 's', s: headerStyle };
@@ -345,7 +345,7 @@ function generateDisputeReportExcel(
     ws[`I${row}`] = { v: t.recipient     || '',                                                  t: 's',               s: textStyle   };
     ws[`J${row}`] = { v: t.recipientIdType  || '',                                               t: 's',               s: textStyle   };
     ws[`K${row}`] = { v: t.recipientIdValue || '',                                               t: 's',               s: textStyle   };
-    ws[`L${row}`] = { v: t.errorType     || '',                                                  t: 's',               s: textStyle   };
+    ws[`L${row}`] = { v: t.lastError ? (typeof t.lastError === 'string' ? t.lastError : JSON.stringify(t.lastError)) : '', t: 's', s: textStyle };
   });
 
   const lastRow = Math.max(4, transfers.length + 4);
