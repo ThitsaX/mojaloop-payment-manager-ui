@@ -1551,6 +1551,13 @@ const transferDirectionOfFunds = [
   },
 ];
 
+const disputeDirectionOfFunds = [
+  {
+    label: helpers.toSpacedPascalCase(TransferDirection.Inbound),
+    value: TransferDirection.Inbound,
+  },
+];
+
 interface TransferFiltersProps {
   model: TransferFilter;
   onFilterChange: ({ field, value }: { field: string; value: FilterChangeValue }) => void;
@@ -1818,8 +1825,8 @@ const TransferFilters: FC<TransferFiltersProps> = ({ model, onFilterChange, date
               id="dispute-modal__direction"
               label="Direction of Funds"
               type="select"
-              options={transferDirectionOfFunds}
-              value={disputeModel.direction || TransferDirection.All}
+              options={disputeDirectionOfFunds}
+              value={disputeModel.direction || TransferDirection.Inbound}
               onChange={(value: FilterChangeValue) => onDisputeFilterChange({ field: 'direction', value })}
             />
           </div>

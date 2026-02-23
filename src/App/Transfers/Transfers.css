@@ -92,3 +92,8 @@
 .transfers__errors__list-container {
   margin: 10px;
 }
+
+/* Allow DatePicker calendar popover to overflow the tabbed modal body */
+.el-modal__body--tabbed {
+  overflow: visible;
+}
