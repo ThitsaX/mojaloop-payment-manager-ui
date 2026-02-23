@@ -1770,53 +1770,52 @@ const TransferFilters: FC<TransferFiltersProps> = ({ model, onFilterChange, date
         )}
 
         {/* Date Range Row */}
-        <div style={{ marginBottom: '24px' }}>
-          <DataLabel size="m">Time Range</DataLabel>
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: '12px', marginTop: '8px', flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <span style={{ fontSize: '12px', color: '#6c757d', fontWeight: 500 }}>Preset</span>
-              <Select
-                id="dispute-modal__date"
-                placeholder="Date"
-                type="select"
-                style={{ width: '180px' }}
-                options={dateRanges}
-                selected={disputeModel.dates || ''}
-                onChange={(value: FilterChangeValue) => onDisputeFilterChange({ field: 'dates', value })}
-              />
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <span style={{ fontSize: '12px', color: '#6c757d', fontWeight: 500 }}>From</span>
-              <DatePicker
-                id="dispute-modal__from"
-                placeholder="From date"
-                style={{ width: '230px' }}
-                withTime
-                value={disputeModel.from || ''}
-                onSelect={(value: FilterChangeValue) => onDisputeFilterChange({ field: 'from', value })}
-                format="x"
-              />
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <span style={{ fontSize: '12px', color: '#6c757d', fontWeight: 500 }}>To</span>
-              <DatePicker
-                id="dispute-modal__to"
-                placeholder="To date"
-                style={{ width: '230px' }}
-                withTime
-                value={disputeModel.to || ''}
-                onSelect={(value: FilterChangeValue) => onDisputeFilterChange({ field: 'to', value })}
-                format="x"
-              />
-            </div>
-          </div>
-          {disputeModel.dates === 'CUSTOM' && !disputeDateRangeError && (disputeModel.from || disputeModel.to) && (
-            <div style={{ marginTop: '8px', fontSize: '12px', color: '#856404', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span>ℹ️</span>
-              <span>Custom date ranges are limited to 1 month maximum.</span>
-            </div>
-          )}
-        </div>
+        <Row style={{ marginBottom: '24px' }}>
+          <Column>
+            <DataLabel size="m">Time Range</DataLabel>
+            <Row>
+              <Column>
+                <Select
+                  id="dispute-modal__date"
+                  placeholder="Date"
+                  type="select"
+                  style={{ width: '180px' }}
+                  options={dateRanges}
+                  selected={disputeModel.dates || ''}
+                  onChange={(value: FilterChangeValue) => onDisputeFilterChange({ field: 'dates', value })}
+                />
+              </Column>
+              <Column>
+                <DatePicker
+                  id="dispute-modal__from"
+                  placeholder="From date"
+                  style={{ width: '230px' }}
+                  withTime
+                  value={disputeModel.from || ''}
+                  onSelect={(value: FilterChangeValue) => onDisputeFilterChange({ field: 'from', value })}
+                  format="x"
+                />
+              </Column>
+              <Column>
+                <DatePicker
+                  id="dispute-modal__to"
+                  placeholder="To date"
+                  style={{ width: '230px' }}
+                  withTime
+                  value={disputeModel.to || ''}
+                  onSelect={(value: FilterChangeValue) => onDisputeFilterChange({ field: 'to', value })}
+                  format="x"
+                />
+              </Column>
+            </Row>
+            {disputeModel.dates === 'CUSTOM' && !disputeDateRangeError && (disputeModel.from || disputeModel.to) && (
+              <div style={{ marginTop: '8px', fontSize: '12px', color: '#856404', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>ℹ️</span>
+                <span>Custom date ranges are limited to 1 month maximum.</span>
+              </div>
+            )}
+          </Column>
+        </Row>
 
         {/* Filters Row */}
         <div style={{ display: 'flex', gap: '32px', flexWrap: 'wrap' }}>
