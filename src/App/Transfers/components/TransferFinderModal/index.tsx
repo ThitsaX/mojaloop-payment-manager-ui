@@ -302,23 +302,39 @@ function generateDisputeReportExcel(
   const fromDate = filters.from ? new Date(filters.from as number).toISOString() : '';
   const toDate = filters.to ? new Date(filters.to as number).toISOString() : '';
 
-  const titleStyle = { font: { name: 'Calibri', sz: 11, bold: true }, alignment: { horizontal: 'left' } };
-  const labelStyle = { font: { name: 'Calibri', sz: 11 }, alignment: { horizontal: 'left' } };
-  const headerStyle = { font: { name: 'Calibri', sz: 11, bold: true }, alignment: { horizontal: 'left' } };
-  const textStyle = { font: { name: 'Calibri', sz: 11 }, alignment: { horizontal: 'left' } };
-  const numStyle = { font: { name: 'Calibri', sz: 11 }, alignment: { horizontal: 'right' } };
-  const amountStyle = { font: { name: 'Calibri', sz: 11 }, alignment: { horizontal: 'right' } };
+  const thinBorder = {
+    top: { style: 'thin', color: { rgb: '000000' } },
+    bottom: { style: 'thin', color: { rgb: '000000' } },
+    left: { style: 'thin', color: { rgb: '000000' } },
+    right: { style: 'thin', color: { rgb: '000000' } },
+  };
+  // Partial borders for cells inside a merged row (only top+bottom on inner cells, add left on first, right on last)
+  const mergeLeftBorder = { top: thinBorder.top, bottom: thinBorder.bottom, left: thinBorder.left };
+  const mergeMidBorder = { top: thinBorder.top, bottom: thinBorder.bottom };
+  const mergeRightBorder = { top: thinBorder.top, bottom: thinBorder.bottom, right: thinBorder.right };
 
-  // Row 1 – Report title
-  ws['A1'] = { v: 'Dispute Transaction Report', t: 's', s: titleStyle };
+  const titleStyle = { font: { name: 'Calibri', sz: 11, bold: true }, alignment: { horizontal: 'left' }, border: mergeLeftBorder };
+  const labelStyle = { font: { name: 'Calibri', sz: 11 }, alignment: { horizontal: 'left' }, border: mergeLeftBorder };
+  const headerStyle = { font: { name: 'Calibri', sz: 11, bold: true }, alignment: { horizontal: 'left' }, border: thinBorder };
+  const textStyle = { font: { name: 'Calibri', sz: 11 }, alignment: { horizontal: 'left' }, border: thinBorder };
+  const numStyle = { font: { name: 'Calibri', sz: 11 }, alignment: { horizontal: 'right' }, border: thinBorder };
+  const amountStyle = { font: { name: 'Calibri', sz: 11 }, alignment: { horizontal: 'right' }, border: thinBorder };
 
-  // Row 2 – Report period
+  const COLS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'];
+
+  // Row 1 – Report title (merged A1:L1)
+  ws['A1'] = { v: 'Dispute Report', t: 's', s: titleStyle };
+  COLS.slice(1, -1).forEach(col => { ws[`${col}1`] = { v: '', t: 's', s: { border: mergeMidBorder } }; });
+  ws['L1'] = { v: '', t: 's', s: { border: mergeRightBorder } };
+
+  // Row 2 – Report period (merged A2:L2)
   ws['A2'] = { v: `Report Period: ${fromDate} to ${toDate}`, t: 's', s: labelStyle };
+  COLS.slice(1, -1).forEach(col => { ws[`${col}2`] = { v: '', t: 's', s: { border: mergeMidBorder } }; });
+  ws['L2'] = { v: '', t: 's', s: { border: mergeRightBorder } };
 
   // Row 3 – empty (spacer)
 
   // Row 4 – Column headers
-  const COLS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'];
   const HEADERS = [
     'No.', 'Transaction ID', 'Direction', 'Currency', 'Amount',
     'Sender', 'Sender ID Type', 'Sender ID Value',
@@ -347,8 +363,12 @@ function generateDisputeReportExcel(
 
   const lastRow = Math.max(4, transfers.length + 4);
   ws['!ref'] = `A1:L${lastRow}`;
+  ws['!merges'] = [
+    { s: { r: 0, c: 0 }, e: { r: 0, c: 11 } }, // A1:L1 – title
+    { s: { r: 1, c: 0 }, e: { r: 1, c: 11 } }, // A2:L2 – report period
+  ];
   ws['!cols'] = [
-    { wch: 8 }, // No.
+    { wch: 8 },  // No.
     { wch: 38 }, // Transaction ID
     { wch: 12 }, // Direction
     { wch: 10 }, // Currency
@@ -359,10 +379,10 @@ function generateDisputeReportExcel(
     { wch: 25 }, // Receiver
     { wch: 18 }, // Receiver ID Type
     { wch: 25 }, // Receiver ID Value
-    { wch: 40 }, // Error Type
+    { wch: 40 }, // Error
   ];
 
-  xlsx.utils.book_append_sheet(wb, ws, 'Dispute Report');
+  xlsx.utils.book_append_sheet(wb, ws, 'Dispute Transaction List');
 
   const dateStr = new Date().toISOString().split('T')[0];
   const filename = partNumber
