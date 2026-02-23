@@ -93,7 +93,9 @@
   margin: 10px;
 }
 
-/* Allow DatePicker calendar popover to overflow the tabbed modal body */
+/* Allow DatePicker calendar popover to overflow the tabbed modal body.
+   The legacy component sets overflow:hidden on this class which clips
+   calendars that open upward when near the bottom of the modal. */
 .el-modal__body--tabbed {
-  overflow: visible;
+  overflow: visible !important;
 }
