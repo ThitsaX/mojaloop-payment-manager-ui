@@ -466,9 +466,9 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
   const [disputeDownloadError, setDisputeDownloadError] = useState<string | null>(null);
   const disputeDownloadCancelledRef = useRef<boolean>(false);
   const maxRetries = 2;
-  const MAX_DOWNLOAD_LIMIT = 20000;
+  const MAX_DOWNLOAD_LIMIT = 50000;
   const MAX_DATE_RANGE_DAYS = 32; // 1 month maximum (31 days + endOf day time component)
-  const RECORDS_PER_FILE = 2500; // Max records per Excel file in ZIP
+  const RECORDS_PER_FILE = 10000; // Max records per Excel file in ZIP
   const DOWNLOAD_CHUNK_SIZE = 1000; // Records to fetch per API call during download (not used yet, but planned)
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastRequestParamsRef = useRef<{ filters: TransferFilter; pagination?: { cursor?: string; limit: number } } | null>(null);
@@ -975,6 +975,7 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
         disputeModel={disputeModel}
         onDisputeFilterChange={onDisputeFilterChange}
         disputeDateRangeError={disputeDateRangeError}
+        selectedTab={activeFilterTab}
         onTabChange={setActiveFilterTab}
       />
     );
@@ -1582,6 +1583,7 @@ interface TransferFiltersProps {
   disputeModel: DisputeFilter;
   onDisputeFilterChange: ({ field, value }: { field: string; value: FilterChangeValue }) => void;
   disputeDateRangeError: string | null;
+  selectedTab: number;
   onTabChange?: (index: number) => void;
 }
 
@@ -1615,13 +1617,13 @@ const nativeDateInputStyle: React.CSSProperties = {
   outline: 'none',
 };
 
-const TransferFilters: FC<TransferFiltersProps> = ({ model, onFilterChange, dateRangeError, disputeModel, onDisputeFilterChange, disputeDateRangeError, onTabChange }) => {
+const TransferFilters: FC<TransferFiltersProps> = ({ model, onFilterChange, dateRangeError, disputeModel, onDisputeFilterChange, disputeDateRangeError, selectedTab, onTabChange }) => {
   const handleTabClick = (index: number) => {
     if (onTabChange) onTabChange(index);
   };
 
   return (
-    <Tabs onSelect={(_e: any, index: number) => handleTabClick(index)}>
+    <Tabs selected={selectedTab} onSelect={(_e: any, index: number) => handleTabClick(index)}>
       <TabList>
         <Tab>Basic Find a Transfer</Tab>
         <Tab>Advanced Filtering</Tab>
