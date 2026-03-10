@@ -379,7 +379,7 @@ function generateDisputeReportExcel(
     { wch: 25 }, // Receiver
     { wch: 18 }, // Receiver ID Type
     { wch: 25 }, // Receiver ID Value
-    { wch: 40 }, // Error
+    { wch: 40, hidden: true }, // Error
   ];
 
   xlsx.utils.book_append_sheet(wb, ws, 'Dispute Transaction List');
@@ -466,9 +466,9 @@ const TransferFinderModal: FC<TransferFinderModalProps> = ({
   const [disputeDownloadError, setDisputeDownloadError] = useState<string | null>(null);
   const disputeDownloadCancelledRef = useRef<boolean>(false);
   const maxRetries = 2;
-  const MAX_DOWNLOAD_LIMIT = 50000;
+  const MAX_DOWNLOAD_LIMIT = 20000;
   const MAX_DATE_RANGE_DAYS = 32; // 1 month maximum (31 days + endOf day time component)
-  const RECORDS_PER_FILE = 10000; // Max records per Excel file in ZIP
+  const RECORDS_PER_FILE = 5000; // Max records per Excel file in ZIP
   const DOWNLOAD_CHUNK_SIZE = 1000; // Records to fetch per API call during download (not used yet, but planned)
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastRequestParamsRef = useRef<{ filters: TransferFilter; pagination?: { cursor?: string; limit: number } } | null>(null);
