@@ -320,17 +320,17 @@ function generateDisputeReportExcel(
   const numStyle = { font: { name: 'Calibri', sz: 11 }, alignment: { horizontal: 'right' }, border: thinBorder };
   const amountStyle = { font: { name: 'Calibri', sz: 11 }, alignment: { horizontal: 'right' }, border: thinBorder };
 
-  const COLS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'];
+  const COLS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K'];
 
-  // Row 1 – Report title (merged A1:L1)
+  // Row 1 – Report title (merged A1:K1)
   ws['A1'] = { v: 'Dispute Report', t: 's', s: titleStyle };
   COLS.slice(1, -1).forEach(col => { ws[`${col}1`] = { v: '', t: 's', s: { border: mergeMidBorder } }; });
-  ws['L1'] = { v: '', t: 's', s: { border: mergeRightBorder } };
+  ws['K1'] = { v: '', t: 's', s: { border: mergeRightBorder } };
 
-  // Row 2 – Report period (merged A2:L2)
+  // Row 2 – Report period (merged A2:K2)
   ws['A2'] = { v: `Report Period: ${fromDate} to ${toDate}`, t: 's', s: labelStyle };
   COLS.slice(1, -1).forEach(col => { ws[`${col}2`] = { v: '', t: 's', s: { border: mergeMidBorder } }; });
-  ws['L2'] = { v: '', t: 's', s: { border: mergeRightBorder } };
+  ws['K2'] = { v: '', t: 's', s: { border: mergeRightBorder } };
 
   // Row 3 – empty (spacer)
 
@@ -338,7 +338,7 @@ function generateDisputeReportExcel(
   const HEADERS = [
     'No.', 'Transaction ID', 'Direction', 'Currency', 'Amount',
     'Sender', 'Sender ID Type', 'Sender ID Value',
-    'Receiver', 'Receiver ID Type', 'Receiver ID Value', 'Error',
+    'Receiver', 'Receiver ID Type', 'Receiver ID Value',
   ];
   COLS.forEach((col, i) => {
     ws[`${col}4`] = { v: HEADERS[i], t: 's', s: headerStyle };
@@ -358,14 +358,13 @@ function generateDisputeReportExcel(
     ws[`I${row}`] = { v: t.recipient || '', t: 's', s: textStyle };
     ws[`J${row}`] = { v: t.recipientIdType || '', t: 's', s: textStyle };
     ws[`K${row}`] = { v: t.recipientIdValue || '', t: 's', s: textStyle };
-    ws[`L${row}`] = { v: t.lastError ? (typeof t.lastError === 'string' ? t.lastError : JSON.stringify(t.lastError)) : '', t: 's', s: textStyle };
   });
 
   const lastRow = Math.max(4, transfers.length + 4);
-  ws['!ref'] = `A1:L${lastRow}`;
+  ws['!ref'] = `A1:K${lastRow}`;
   ws['!merges'] = [
-    { s: { r: 0, c: 0 }, e: { r: 0, c: 11 } }, // A1:L1 – title
-    { s: { r: 1, c: 0 }, e: { r: 1, c: 11 } }, // A2:L2 – report period
+    { s: { r: 0, c: 0 }, e: { r: 0, c: 10 } }, // A1:K1 – title
+    { s: { r: 1, c: 0 }, e: { r: 1, c: 10 } }, // A2:K2 – report period
   ];
   ws['!cols'] = [
     { wch: 8 },  // No.
@@ -379,7 +378,6 @@ function generateDisputeReportExcel(
     { wch: 25 }, // Receiver
     { wch: 18 }, // Receiver ID Type
     { wch: 25 }, // Receiver ID Value
-    { wch: 40, hidden: true }, // Error
   ];
 
   xlsx.utils.book_append_sheet(wb, ws, 'Dispute Transaction List');
