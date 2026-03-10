@@ -83,7 +83,7 @@ const TransfersErrors: FC<TransfersErrorsProps> = ({
     content = (
       <>
         <ErrorsList items={items.slice(0, 4)} onTransferRowClick={onTransferRowClick} />
-        {items.length > 0 && (
+        {/* {items.length > 0 && (
           <Button
             label="Download Errors"
             kind="secondary"
@@ -92,8 +92,8 @@ const TransfersErrors: FC<TransfersErrorsProps> = ({
             className="transfers__errors__download__button"
             onClick={() => downloadErrorsToExcel(items)}
           />
-        )}
-        {items.length > 4 && (
+        )} */}
+        {/* {items.length > 4 && (
           <Button
             label="View All Errors"
             noFill
@@ -102,7 +102,7 @@ const TransfersErrors: FC<TransfersErrorsProps> = ({
             className="transfers__errors__button"
             onClick={onViewAllClick}
           />
-        )}
+        )} */}
         {isViewAllActive && <TransfersErrorsModal />}
       </>
     );
