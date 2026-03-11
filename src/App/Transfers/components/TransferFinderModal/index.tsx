@@ -217,17 +217,48 @@ function generateExcelFileForChunk(
   chunkIndex: number,
   dateFormat: 'iso' | 'readable' = 'iso'
 ): { filename: string; content: ArrayBuffer } {
-  // Format dates in transfer data before creating Excel
-  const formattedTransfers = transfers.map(transfer => ({
-    ...transfer,
-    initiatedTimestamp: transfer.initiatedTimestamp
+  const rows = transfers.map(transfer => ({
+    'Transaction ID': transfer.id || '',
+    'Direction': transfer.direction || '',
+    'Status': transfer.status || '',
+    'Currency': transfer.currency || '',
+    'Amount': transfer.amount ?? '',
+    'Sender': transfer.sender || '',
+    'Sender ID Type': transfer.senderIdType || '',
+    'Sender ID Value': transfer.senderIdValue || '',
+    'Receiver': transfer.recipient || '',
+    'Receiver ID Type': transfer.recipientIdType || '',
+    'Receiver ID Value': transfer.recipientIdValue || '',
+    'Institution': transfer.institution || '',
+    'Home Transfer ID': transfer.homeTransferId || '',
+    'Details': transfer.details || '',
+    'Initiated At': transfer.initiatedTimestamp
       ? helpers.toTransfersDate(transfer.initiatedTimestamp, dateFormat)
-      : transfer.initiatedTimestamp
+      : '',
+    'Error': transfer.lastError
+      ? (typeof transfer.lastError === 'string' ? transfer.lastError : JSON.stringify(transfer.lastError))
+      : '',
   }));
 
-  const ws = xlsx.utils.json_to_sheet(formattedTransfers);
-  const wscols = [{ wch: 20 }];
-  ws['!cols'] = wscols;
+  const ws = xlsx.utils.json_to_sheet(rows);
+  ws['!cols'] = [
+    { wch: 38 }, // Transaction ID
+    { wch: 12 }, // Direction
+    { wch: 10 }, // Status
+    { wch: 10 }, // Currency
+    { wch: 15 }, // Amount
+    { wch: 25 }, // Sender
+    { wch: 18 }, // Sender ID Type
+    { wch: 25 }, // Sender ID Value
+    { wch: 25 }, // Receiver
+    { wch: 18 }, // Receiver ID Type
+    { wch: 25 }, // Receiver ID Value
+    { wch: 20 }, // Institution
+    { wch: 30 }, // Home Transfer ID
+    { wch: 30 }, // Details
+    { wch: 28 }, // Initiated At
+    { wch: 40 }, // Error
+  ];
   const wb = xlsx.utils.book_new();
   xlsx.utils.book_append_sheet(wb, ws, 'Transfers');
 
@@ -271,21 +302,16 @@ async function downloadTransfersToExcel(
   transfers: any,
   dateFormat: 'iso' | 'readable' = 'iso'
 ): Promise<void> {
-  // Format dates in transfer data before creating Excel
-  const formattedTransfers = transfers.map((transfer: any) => ({
-    ...transfer,
-    initiatedTimestamp: transfer.initiatedTimestamp
-      ? helpers.toTransfersDate(transfer.initiatedTimestamp, dateFormat)
-      : transfer.initiatedTimestamp
-  }));
-
-  const ws = xlsx.utils.json_to_sheet(formattedTransfers);
-  const wscols = [{ wch: 20 }];
-  ws['!cols'] = wscols;
-  const wb = xlsx.utils.book_new();
-  xlsx.utils.book_append_sheet(wb, ws, 'Transfers');
-  const fileName: string = `Payment_Manager_Transfers_${new Date().toDateString()}.xlsx`;
-  xlsx.writeFile(wb, fileName);
+  const { filename, content } = generateExcelFileForChunk(transfers, 1, dateFormat);
+  const blob = new Blob([content], { type: 'application/octet-stream' });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `Payment_Manager_Transfers_${new Date().toISOString().split('T')[0]}.xlsx`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.URL.revokeObjectURL(url);
 }
 
 // Generates a formatted Dispute Transaction Report Excel workbook.
